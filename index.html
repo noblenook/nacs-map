@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NACS 충전지도</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --text:#14171c; --muted:#6b7280; --line:#e5e7eb;
+  --accent:#e31937; --ok:#16a34a; --busy:#f59e0b; --off:#9ca3af;
+  --shadow:0 4px 18px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --panel:#1a1d23; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
+    --shadow:0 4px 18px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --panel:#1a1d23; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
+  --shadow:0 4px 18px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif}
+#map{position:fixed;inset:0}
+.top{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;z-index:1000;display:flex;gap:8px}
+.search{flex:1;display:flex;align-items:center;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:0 12px;min-width:0}
+.search input{flex:1;border:0;background:transparent;color:var(--text);font-size:16px;padding:12px 0;outline:none;min-width:0}
+.chip{background:var(--panel);color:var(--text);border:0;border-radius:12px;box-shadow:var(--shadow);padding:0 12px;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--ok);color:#fff}
+.meta{position:fixed;top:calc(env(safe-area-inset-top) + 62px);left:12px;z-index:1000;font-size:12px;color:var(--muted);
+  background:var(--panel);padding:4px 8px;border-radius:8px;box-shadow:var(--shadow)}
+.meta.warn{color:#fff;background:var(--accent)}
+.fab{position:fixed;right:12px;z-index:1000;width:48px;height:48px;border-radius:50%;border:0;background:var(--panel);color:var(--text);
+  box-shadow:var(--shadow);font-size:22px;cursor:pointer;display:grid;place-items:center}
+#locate{bottom:calc(env(safe-area-inset-bottom) + 200px)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:1000;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
+  max-height:180px;overflow:auto;padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);transition:max-height .2s}
+.sheet.open{max-height:70vh}
+.handle{width:40px;height:4px;border-radius:2px;background:var(--line);margin:2px auto 8px;cursor:pointer}
+.sheet h3{margin:0 0 6px;font-size:14px;color:var(--muted);font-weight:600;cursor:pointer}
+.row{display:flex;gap:10px;align-items:center;padding:10px 4px;border-top:1px solid var(--line);cursor:pointer}
+.row:first-of-type{border-top:0}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.row .t{flex:1;min-width:0}
+.row .n{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .a{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{font-size:13px;color:var(--muted);flex:none;text-align:right}
+.pin{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center}
+.pin span{transform:rotate(45deg);color:#fff;font-size:11px;font-weight:700}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--text)}
+.leaflet-popup-content{margin:12px 14px;font-size:13px;line-height:1.45;min-width:220px}
+.pop h4{margin:0 0 2px;font-size:15px}
+.pop .s{color:var(--muted);font-size:12px}
+.pop table{width:100%;border-collapse:collapse;margin:8px 0}
+.pop td{padding:3px 0;border-top:1px solid var(--line)}
+.badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:700;color:#fff}
+.nav{display:flex;gap:6px;margin-top:8px}
+.nav a{flex:1;text-align:center;text-decoration:none;font-weight:700;font-size:13px;padding:8px 0;border-radius:8px;color:#fff}
+.me{width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
+.empty{padding:12px 4px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+  <label class="search"><input id="q" type="search" placeholder="충전소 이름·주소 검색" autocomplete="off"></label>
+  <button id="avail" class="chip" type="button">사용가능</button>
+</div>
+<div id="meta" class="meta">불러오는 중…</div>
+<button id="locate" class="fab" type="button" aria-label="내 위치">◎</button>
+
+<div id="sheet" class="sheet">
+  <div class="handle" id="handle"></div>
+  <h3 id="sheetTitle">가까운 NACS 충전소</h3>
+  <div id="list"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+// 환경부 API stat 코드
+const STAT = {
+  "1": ["통신이상", "var(--off)"], "2": ["충전대기", "var(--ok)"], "3": ["충전중", "var(--busy)"],
+  "4": ["운영중지", "var(--off)"], "5": ["점검중", "var(--off)"], "9": ["상태미확인", "var(--off)"]
+};
+const TYPE = { "09": "NACS", "10": "DC콤보+NACS" };
+
+const map = L.map("map", { zoomControl: false }).setView([36.4, 127.8], 7);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "© OpenStreetMap"
+}).addTo(map);
+const cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 });
+map.addLayer(cluster);
+
+let stations = [], me = null, meMarker = null, onlyAvail = false, query = "";
+const $ = id => document.getElementById(id);
+
+function summary(s) {
+  const free = s.chargers.filter(c => c.stat === "2").length;
+  const busy = s.chargers.filter(c => c.stat === "3").length;
+  const color = free ? "var(--ok)" : busy ? "var(--busy)" : "var(--off)";
+  return { free, busy, total: s.chargers.length, color };
+}
+function dist(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function fmtKm(km) { return km < 1 ? Math.round(km * 1000) + "m" : km.toFixed(1) + "km"; }
+function esc(t) { return String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function fmtTime(t) { return t && t.length >= 12 ? `${t.slice(4, 6)}/${t.slice(6, 8)} ${t.slice(8, 10)}:${t.slice(10, 12)}` : ""; }
+
+function popupHtml(s) {
+  const rows = s.chargers.map(c => {
+    const [label, col] = STAT[c.stat] || ["알수없음", "var(--off)"];
+    return `<tr><td>#${esc(c.id)} ${esc(TYPE[c.type] || c.type)}${c.kw ? ` · ${esc(c.kw)}kW` : ""}</td>
+      <td style="text-align:right"><span class="badge" style="background:${col}">${label}</span></td></tr>`;
+  }).join("");
+  const name = encodeURIComponent(s.name);
+  const extra = [
+    s.useTime && `🕒 ${esc(s.useTime)}`,
+    s.parkingFree === "Y" ? "🅿️ 주차 무료" : s.parkingFree === "N" ? "🅿️ 주차 유료" : "",
+    s.limit && `⚠️ ${esc(s.limit)}`,
+    s.note && `ℹ️ ${esc(s.note)}`,
+    s.busi && `${esc(s.busi)}${s.call ? ` · <a href="tel:${esc(s.call)}">${esc(s.call)}</a>` : ""}`
+  ].filter(Boolean).join("<br>");
+  return `<div class="pop"><h4>${esc(s.name)}</h4>
+    <div class="s">${esc(s.addr)}${s.loc && s.loc !== "null" ? ` (${esc(s.loc)})` : ""}${me ? ` · ${fmtKm(dist(me, s))}` : ""}</div>
+    <table>${rows}</table>
+    <div class="s">${extra}</div>
+    <div class="nav">
+      <a style="background:#fee500;color:#111" href="https://map.kakao.com/link/to/${name},${s.lat},${s.lng}" target="_blank" rel="noopener">카카오맵</a>
+      <a style="background:#03c75a" href="nmap://navigation?dlat=${s.lat}&dlng=${s.lng}&dname=${name}&appname=nacsmap">네이버</a>
+      <a style="background:#3b5bff" href="tmap://route?goalname=${name}&goalx=${s.lng}&goaly=${s.lat}">T맵</a>
+    </div></div>`;
+}
+
+function visible() {
+  const q = query.trim().toLowerCase();
+  return stations.filter(s => (!onlyAvail || s._sum.free > 0) &&
+    (!q || s.name.toLowerCase().includes(q) || s.addr.toLowerCase().includes(q)));
+}
+
+function render() {
+  cluster.clearLayers();
+  const vis = visible();
+  cluster.addLayers(vis.map(s => s._marker));
+  renderList(vis);
+}
+
+function renderList(vis) {
+  const center = me || map.getCenter();
+  const sorted = vis.map(s => [dist(center, s), s]).sort((a, b) => a[0] - b[0]).slice(0, 30);
+  $("sheetTitle").textContent = query ? `검색 결과 ${vis.length}곳` : me ? "내 주변 NACS 충전소" : "지도 중심 근처 NACS 충전소";
+  $("list").innerHTML = sorted.length ? sorted.map(([d, s]) =>
+    `<div class="row" data-id="${esc(s.id)}"><span class="dot" style="background:${s._sum.color}"></span>
+      <div class="t"><div class="n">${esc(s.name)}</div><div class="a">${esc(s.addr)}</div></div>
+      <div class="d">${fmtKm(d)}<br>${s._sum.free}/${s._sum.total} 가능</div></div>`).join("")
+    : `<div class="empty">조건에 맞는 충전소가 없습니다.</div>`;
+}
+
+$("list").addEventListener("click", e => {
+  const row = e.target.closest(".row"); if (!row) return;
+  const s = stations.find(x => x.id === row.dataset.id); if (!s) return;
+  $("sheet").classList.remove("open");
+  cluster.zoomToShowLayer(s._marker, () => s._marker.openPopup());
+});
+$("handle").onclick = $("sheetTitle").onclick = () => $("sheet").classList.toggle("open");
+$("avail").onclick = () => { onlyAvail = !onlyAvail; $("avail").classList.toggle("on", onlyAvail); render(); };
+let qt; $("q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value; render(); }, 200); });
+map.on("moveend", () => { if (!me && !query) renderList(visible()); });
+
+function locate(fly) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(p => {
+    me = { lat: p.coords.latitude, lng: p.coords.longitude };
+    if (!meMarker) meMarker = L.marker([me.lat, me.lng], { icon: L.divIcon({ className: "", html: '<div class="me"></div>', iconSize: [16, 16] }), interactive: false }).addTo(map);
+    else meMarker.setLatLng([me.lat, me.lng]);
+    if (fly) map.setView([me.lat, me.lng], 13);
+    renderList(visible());
+  }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+}
+$("locate").onclick = () => locate(true);
+
+fetch("nacs.json", { cache: "no-store" }).then(r => r.json()).then(d => {
+  stations = d.stations;
+  for (const s of stations) {
+    s._sum = summary(s);
+    s._marker = L.marker([s.lat, s.lng], {
+      icon: L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
+        html: `<div class="pin" style="background:${s._sum.color}"><span>${s._sum.free}</span></div>` })
+    }).bindPopup(() => popupHtml(s));
+  }
+  const n = stations.reduce((a, s) => a + s.chargers.length, 0);
+  $("meta").textContent = `${d.sample ? "⚠️ 샘플 데이터 · " : ""}충전소 ${stations.length}곳 · ${n}기 · 상태 기준 ${d.generatedAt}`;
+  if (d.sample) $("meta").classList.add("warn");
+  render();
+  locate(true);
+}).catch(() => { $("meta").textContent = "nacs.json 을 불러오지 못했습니다"; $("meta").classList.add("warn"); });
+</script>
+</body>
+</html>
