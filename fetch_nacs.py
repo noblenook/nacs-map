@@ -9,6 +9,7 @@
 옵션:
   --codes 09,10   NACS 로 간주할 chgerType 코드 (기본 09,10)
   --types         전체 chgerType 분포만 출력하고 종료 (코드 확인용)
+  --status        전체를 다시 받지 않고 nacs.json 의 충전 상태만 최근 변경분으로 갱신 (API 호출 2~3회)
 """
 import argparse
 import json
@@ -20,7 +21,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-BASE = "https://apis.data.go.kr/B552584/EvCharger/getChargerInfo"
+API = "https://apis.data.go.kr/B552584/EvCharger/"
 ROWS = 9999
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,13 +38,13 @@ def load_key():
     return urllib.parse.unquote(key)
 
 
-def fetch_page(key, page):
+def fetch_page(key, page, op="getChargerInfo", **extra):
     q = urllib.parse.urlencode(
-        {"serviceKey": key, "pageNo": page, "numOfRows": ROWS, "dataType": "JSON"}
+        {"serviceKey": key, "pageNo": page, "numOfRows": ROWS, "dataType": "JSON", **extra}
     )
     for attempt in range(4):
         try:
-            with urllib.request.urlopen(f"{BASE}?{q}", timeout=120) as r:
+            with urllib.request.urlopen(f"{API}{op}?{q}", timeout=120) as r:
                 body = r.read().decode("utf-8")
             return parse(body)
         except Exception as e:  # 네트워크 오류 등은 재시도
@@ -73,11 +74,40 @@ def parse(body):
     return total, items
 
 
+def now():
+    # GitHub Actions(UTC)에서도 한국 시각으로 기록
+    from datetime import timedelta, timezone
+    return datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
+
+
+def update_status(key):
+    path = os.path.join(HERE, "nacs.json")
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    index = {(s["id"], c["id"]): c for s in data["stations"] for c in s["chargers"]}
+    total, items = fetch_page(key, 1, "getChargerStatus", period=10)
+    for p in range(2, max(1, -(-total // ROWS)) + 1):
+        items.extend(fetch_page(key, p, "getChargerStatus", period=10)[1])
+    changed = 0
+    for it in items:
+        c = index.get((it.get("statId"), it.get("chgerId")))
+        if c and (c["stat"], c["upd"]) != (str(it.get("stat")), it.get("statUpdDt", "")):
+            c["stat"], c["upd"] = str(it.get("stat")), it.get("statUpdDt", "")
+            changed += 1
+    data["generatedAt"] = now()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"최근 10분 변경 {len(items):,}건 중 NACS {changed}건 반영")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--codes", default="09,10")
     ap.add_argument("--types", action="store_true")
+    ap.add_argument("--status", action="store_true")
     args = ap.parse_args()
+    if args.status:
+        return update_status(load_key())
     nacs_codes = {c.strip().zfill(2) for c in args.codes.split(",") if c.strip()}
 
     key = load_key()
@@ -134,7 +164,7 @@ def main():
         )
 
     out = {
-        "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generatedAt": now(),
         "codes": sorted(nacs_codes),
         "stations": list(stations.values()),
     }

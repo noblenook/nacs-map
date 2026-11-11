@@ -1,0 +1,51 @@
+# NACS 충전기 데이터 자동 갱신
+#  - 10분마다: 최근 변경된 충전 상태만 반영 (API 2~3회)
+#  - 매일 03:00 KST: 전체 충전소 목록 새로 받기 (API 약 53회)
+# 저장소 Settings > Secrets > Actions 에 DATA_GO_KR_KEY 가 있어야 합니다.
+name: update-data
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "전체 목록 다시 받기"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ "${{ github.event.schedule }}" = "0 18 * * *" ] || [ "${{ inputs.full }}" = "true" ]; then
+            python fetch_nacs.py
+          else
+            python fetch_nacs.py --status
+          fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nacs.json
+          git diff --cached --quiet && exit 0
+          git commit -m "데이터 갱신 $(TZ=Asia/Seoul date +'%m-%d %H:%M')"
+          git pull --rebase -q && git push

@@ -189,21 +189,88 @@ function locate(fly) {
 }
 $("locate").onclick = () => locate(true);
 
-fetch("nacs.json", { cache: "no-store" }).then(r => r.json()).then(d => {
-  stations = d.stations;
-  for (const s of stations) {
-    s._sum = summary(s);
-    s._marker = L.marker([s.lat, s.lng], {
-      icon: L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
-        html: `<div class="pin" style="background:${s._sum.color}"><span>${s._sum.free}</span></div>` })
-    }).bindPopup(() => popupHtml(s));
-  }
+// ── 데이터 로딩 & 갱신 ──
+// 앱(APK)·GitHub Pages: GitHub Actions 가 10분마다 갱신하는 저장소의 nacs.json
+// 로컬 개발(localhost): 같은 폴더의 nacs.json
+const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const REMOTE = "https://raw.githubusercontent.com/noblenook/nacs-map/main/nacs.json";
+const DATA_URL = !isNative && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "nacs.json" : REMOTE;
+const LIVE_KEY = isNative ? window.NACS_KEY : null;   // APK 빌드 때만 주입됨
+let baseTime = "", liveTime = null, firstLoad = true, isSample = false;
+
+function iconFor(s) {
+  return L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
+    html: `<div class="pin" style="background:${s._sum.color}"><span>${s._sum.free}</span></div>` });
+}
+function refreshStation(s) {
+  const prev = s._sum;
+  s._sum = summary(s);
+  if (!prev || prev.free !== s._sum.free || prev.color !== s._sum.color) s._marker.setIcon(iconFor(s));
+  if (s._marker.isPopupOpen()) s._marker.getPopup().setContent(popupHtml(s));
+}
+function ago(d) {
+  const m = Math.round((Date.now() - d) / 60000);
+  return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
+}
+function showMeta() {
+  const sample = isSample;
   const n = stations.reduce((a, s) => a + s.chargers.length, 0);
-  $("meta").textContent = `${d.sample ? "⚠️ 샘플 데이터 · " : ""}충전소 ${stations.length}곳 · ${n}기 · 상태 기준 ${d.generatedAt}`;
-  if (d.sample) $("meta").classList.add("warn");
-  render();
-  locate(true);
-}).catch(() => { $("meta").textContent = "nacs.json 을 불러오지 못했습니다"; $("meta").classList.add("warn"); });
+  const base = new Date(baseTime.replace(" ", "T") + ":00+09:00");
+  const t = liveTime && liveTime > base ? liveTime : base;
+  $("meta").textContent = `${sample ? "⚠️ 샘플 데이터 · " : ""}충전소 ${stations.length}곳 · ${n}기 · 상태 ${isNaN(t) ? baseTime : ago(t)}${liveTime ? " · 실시간" : ""}`;
+  $("meta").classList.toggle("warn", !!sample);
+}
+
+async function loadData() {
+  const r = await fetch(DATA_URL + (DATA_URL === REMOTE ? `?t=${Math.floor(Date.now() / 60000)}` : ""), { cache: "no-store" });
+  const d = await r.json();
+  const old = new Map(stations.map(s => [s.id, s]));
+  stations = d.stations.map(s => {
+    const o = old.get(s.id);
+    if (o) { Object.assign(o, s); refreshStation(o); return o; }
+    s._sum = summary(s);
+    s._marker = L.marker([s.lat, s.lng], { icon: iconFor(s) }).bindPopup(() => popupHtml(s));
+    return s;
+  });
+  baseTime = d.generatedAt; isSample = !!d.sample;
+  showMeta();
+  if (firstLoad) { firstLoad = false; render(); locate(true); }
+  else if (stations.length !== old.size) render();
+  else renderList(visible());
+}
+
+// APK 전용: 환경부 API 에서 최근 5분 상태 변경을 직접 받아 즉시 반영
+async function liveStatus() {
+  if (!LIVE_KEY || !stations.length) return;
+  const idx = new Map();
+  for (const s of stations) for (const c of s.chargers) idx.set(s.id + "|" + c.id, [s, c]);
+  const touched = new Set();
+  for (let page = 1; page <= 5; page++) {
+    const q = new URLSearchParams({ serviceKey: LIVE_KEY, pageNo: page, numOfRows: 9999, period: 5, dataType: "JSON" });
+    const d = await (await fetch("https://apis.data.go.kr/B552584/EvCharger/getChargerStatus?" + q)).json();
+    let items = (d.items && d.items.item) || [];
+    if (!Array.isArray(items)) items = [items];
+    for (const it of items) {
+      const hit = idx.get(it.statId + "|" + it.chgerId);
+      if (hit && (it.statUpdDt || "") >= (hit[1].upd || "")) { hit[1].stat = String(it.stat); hit[1].upd = it.statUpdDt || ""; touched.add(hit[0]); }
+    }
+    if (page * 9999 >= (+d.totalCount || 0)) break;
+  }
+  touched.forEach(refreshStation);
+  liveTime = new Date();
+  showMeta();
+  renderList(visible());
+}
+
+async function tick() {
+  if (document.hidden) return;
+  try { await loadData(); } catch (e) { if (firstLoad) { $("meta").textContent = "데이터를 불러오지 못했습니다. 인터넷 연결을 확인하세요"; $("meta").classList.add("warn"); } }
+  try { await liveStatus(); } catch (e) { /* 실시간 실패 시 10분 단위 데이터로 계속 */ }
+}
+tick();
+setInterval(tick, (LIVE_KEY ? 2 : 3) * 60000);
+setInterval(() => stations.length && showMeta(), 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 </script>
 </body>
 </html>
