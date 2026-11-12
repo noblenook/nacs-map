@@ -80,6 +80,36 @@ def now():
     return datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
 
 
+SC_URL = "https://supercharge.info/service/supercharge/allSites"
+
+
+def fetch_superchargers():
+    """supercharge.info(커뮤니티 데이터)에서 한국의 운영 중인 테슬라 슈퍼차저 목록."""
+    req = urllib.request.Request(SC_URL, headers={"User-Agent": "nacs-map-personal"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        sites = json.load(r)
+    out = []
+    for s in sites:
+        a = s.get("address") or {}
+        g = s.get("gps") or {}
+        if a.get("country") != "South Korea" or s.get("status") != "OPEN":
+            continue
+        out.append(
+            {
+                "id": "SC" + str(s.get("id")),
+                "name": (s.get("name") or "").replace(", South Korea", ""),
+                "addr": " ".join(x for x in (a.get("state"), a.get("city"), a.get("street")) if x),
+                "lat": round(float(g["latitude"]), 6),
+                "lng": round(float(g["longitude"]), 6),
+                "stalls": s.get("stallCount") or 0,
+                "kw": s.get("powerKilowatt") or 0,
+                "otherEVs": bool(s.get("otherEVs")),
+            }
+        )
+    print(f"슈퍼차저 {len(out)}곳")
+    return out
+
+
 def update_status(key):
     path = os.path.join(HERE, "nacs.json")
     with open(path, encoding="utf-8") as f:
@@ -163,10 +193,21 @@ def main():
             }
         )
 
+    try:
+        sc = fetch_superchargers()
+    except Exception as e:  # 슈퍼차저 실패 시 기존 목록 유지
+        print(f"슈퍼차저 목록 실패, 기존 값 유지: {e}")
+        try:
+            with open(os.path.join(HERE, "nacs.json"), encoding="utf-8") as f:
+                sc = json.load(f).get("superchargers", [])
+        except Exception:
+            sc = []
+
     out = {
         "generatedAt": now(),
         "codes": sorted(nacs_codes),
         "stations": list(stations.values()),
+        "superchargers": sc,
     }
     with open(os.path.join(HERE, "nacs.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))

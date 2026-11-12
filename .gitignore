@@ -4,3 +4,4 @@ __pycache__/
 node_modules/
 www/
 *.apk
+kakao_key.txt

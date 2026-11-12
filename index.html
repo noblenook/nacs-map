@@ -9,49 +9,73 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
 <style>
 :root{
-  --bg:#f6f7f9; --panel:#ffffff; --text:#14171c; --muted:#6b7280; --line:#e5e7eb;
-  --accent:#e31937; --ok:#16a34a; --busy:#f59e0b; --off:#9ca3af;
+  --bg:#f6f7f9; --panel:#ffffff; --panel2:#f1f3f6; --text:#14171c; --muted:#6b7280; --line:#e5e7eb;
+  --sc:#e31937; --ok:#16a34a; --busy:#f59e0b; --off:#9ca3af; --route:#2563eb; --chipOn:#14171c; --chipOnText:#ffffff;
   --shadow:0 4px 18px rgba(0,0,0,.12);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0f1115; --panel:#1a1d23; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
-    --shadow:0 4px 18px rgba(0,0,0,.5);
+    --bg:#0f1115; --panel:#1a1d23; --panel2:#23272f; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
+    --route:#60a5fa; --chipOn:#eceff4; --chipOnText:#14171c; --shadow:0 4px 18px rgba(0,0,0,.5);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0f1115; --panel:#1a1d23; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
-  --shadow:0 4px 18px rgba(0,0,0,.5);
+  --bg:#0f1115; --panel:#1a1d23; --panel2:#23272f; --text:#eceff4; --muted:#9aa3af; --line:#2c313a;
+  --route:#60a5fa; --chipOn:#eceff4; --chipOnText:#14171c; --shadow:0 4px 18px rgba(0,0,0,.5);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif}
+button{font:inherit;color:inherit}
 #map{position:fixed;inset:0}
-.top{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;z-index:1000;display:flex;gap:8px}
-.search{flex:1;display:flex;align-items:center;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:0 12px;min-width:0}
-.search input{flex:1;border:0;background:transparent;color:var(--text);font-size:16px;padding:12px 0;outline:none;min-width:0}
-.chip{background:var(--panel);color:var(--text);border:0;border-radius:12px;box-shadow:var(--shadow);padding:0 12px;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
-.chip.on{background:var(--ok);color:#fff}
-.meta{position:fixed;top:calc(env(safe-area-inset-top) + 62px);left:12px;z-index:1000;font-size:12px;color:var(--muted);
-  background:var(--panel);padding:4px 8px;border-radius:8px;box-shadow:var(--shadow)}
-.meta.warn{color:#fff;background:var(--accent)}
-.fab{position:fixed;right:12px;z-index:1000;width:48px;height:48px;border-radius:50%;border:0;background:var(--panel);color:var(--text);
+
+/* 상단 */
+.top{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+.bar{display:flex;gap:8px}
+.search{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:0 12px;min-width:0;border:0;text-align:left;cursor:pointer;min-height:46px}
+.search .ph{flex:1;color:var(--muted);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search .val{flex:1;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:46px;flex:none;border:0;border-radius:12px;background:var(--panel);box-shadow:var(--shadow);font-size:18px;cursor:pointer}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;background:var(--panel);border:0;border-radius:999px;box-shadow:var(--shadow);padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px}
+.chip .sw{width:8px;height:8px;border-radius:50%}
+.chip.on{background:var(--chipOn);color:var(--chipOnText)}
+.chip.sep{background:transparent;box-shadow:none;padding:0 2px;cursor:default;color:var(--muted)}
+.meta{align-self:flex-start;font-size:12px;color:var(--muted);background:var(--panel);padding:4px 8px;border-radius:8px;box-shadow:var(--shadow)}
+.meta.warn{color:#fff;background:var(--sc)}
+
+.fab{position:fixed;right:12px;z-index:1000;width:48px;height:48px;border-radius:50%;border:0;background:var(--panel);
   box-shadow:var(--shadow);font-size:22px;cursor:pointer;display:grid;place-items:center}
-#locate{bottom:calc(env(safe-area-inset-bottom) + 200px)}
+#locate{bottom:calc(env(safe-area-inset-bottom) + 216px)}
+
+/* 하단 시트 */
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1000;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:var(--shadow);
-  max-height:180px;overflow:auto;padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);transition:max-height .2s}
-.sheet.open{max-height:70vh}
+  max-height:196px;overflow:auto;padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);transition:max-height .2s}
+.sheet.open{max-height:72vh}
 .handle{width:40px;height:4px;border-radius:2px;background:var(--line);margin:2px auto 8px;cursor:pointer}
 .sheet h3{margin:0 0 6px;font-size:14px;color:var(--muted);font-weight:600;cursor:pointer}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 8px}
+.sumcard{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.sumcard .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sumcard .v{font-size:17px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.sumcard .v small{font-size:12px;font-weight:600;color:var(--muted)}
+.routeinfo{font-size:13px;color:var(--muted);margin-bottom:2px}
 .row{display:flex;gap:10px;align-items:center;padding:10px 4px;border-top:1px solid var(--line);cursor:pointer}
-.row:first-of-type{border-top:0}
 .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.dot.sq{border-radius:3px}
 .row .t{flex:1;min-width:0}
 .row .n{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .a{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .d{font-size:13px;color:var(--muted);flex:none;text-align:right}
+.row .d{font-size:13px;color:var(--muted);flex:none;text-align:right;font-variant-numeric:tabular-nums}
+.empty{padding:12px 4px;color:var(--muted);font-size:14px}
+
+/* 핀 */
 .pin{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center}
 .pin span{transform:rotate(45deg);color:#fff;font-size:11px;font-weight:700}
+.scpin{width:26px;height:26px;border-radius:7px;background:var(--sc);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}
+.endpin{width:22px;height:22px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font-size:10px;font-weight:800}
+.me{width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--text)}
 .leaflet-popup-content{margin:12px 14px;font-size:13px;line-height:1.45;min-width:220px}
 .pop h4{margin:0 0 2px;font-size:15px}
@@ -61,216 +85,533 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
 .badge{display:inline-block;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:700;color:#fff}
 .nav{display:flex;gap:6px;margin-top:8px}
 .nav a{flex:1;text-align:center;text-decoration:none;font-weight:700;font-size:13px;padding:8px 0;border-radius:8px;color:#fff}
-.me{width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
-.empty{padding:12px 4px;color:var(--muted);font-size:14px}
+
+/* 검색 패널 */
+.panel{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 10px) 12px calc(env(safe-area-inset-bottom) + 10px)}
+.panel[hidden]{display:none}
+.phead{display:flex;gap:8px;align-items:flex-start}
+.fields{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.field{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:10px;padding:0 10px;border:2px solid transparent}
+.field.active{border-color:var(--route)}
+.field b{font-size:12px;color:var(--muted);flex:none;width:28px}
+.field input{flex:1;border:0;background:transparent;color:var(--text);font-size:16px;padding:11px 0;outline:none;min-width:0}
+.textbtn{border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:600;padding:10px 6px;cursor:pointer}
+.results{flex:1;overflow:auto;margin-top:10px}
+.results .row:first-child{border-top:0}
+.primary{border:0;border-radius:10px;background:var(--route);color:#fff;font-weight:700;font-size:15px;padding:12px;cursor:pointer;margin-top:8px}
+.primary:disabled{opacity:.4;cursor:default}
+.hint{font-size:13px;color:var(--muted);padding:10px 4px;line-height:1.5}
+.settings label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+.settings input{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:10px;padding:11px;font-size:15px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 210px);z-index:3000;background:var(--chipOn);color:var(--chipOnText);
+  padding:9px 14px;border-radius:10px;font-size:14px;box-shadow:var(--shadow);max-width:90vw}
+.toast[hidden]{display:none}
+:focus-visible{outline:2px solid var(--route);outline-offset:2px}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
 <div class="top">
-  <label class="search"><input id="q" type="search" placeholder="충전소 이름·주소 검색" autocomplete="off"></label>
-  <button id="avail" class="chip" type="button">사용가능</button>
+  <div class="bar">
+    <button id="openSearch" class="search" type="button"><span>🔍</span><span id="destLabel" class="ph">목적지 검색 · 경로 위 충전소 보기</span></button>
+    <button id="clearRoute" class="iconbtn" type="button" aria-label="경로 지우기" hidden>✕</button>
+    <button id="openSettings" class="iconbtn" type="button" aria-label="설정">⚙</button>
+  </div>
+  <div id="chips" class="chips"></div>
+  <div id="meta" class="meta">불러오는 중…</div>
 </div>
-<div id="meta" class="meta">불러오는 중…</div>
 <button id="locate" class="fab" type="button" aria-label="내 위치">◎</button>
 
 <div id="sheet" class="sheet">
   <div class="handle" id="handle"></div>
-  <h3 id="sheetTitle">가까운 NACS 충전소</h3>
+  <h3 id="sheetTitle">가까운 충전소</h3>
+  <div id="routeBox"></div>
   <div id="list"></div>
 </div>
 
+<!-- 출발지·목적지 검색 -->
+<div id="searchPanel" class="panel" hidden>
+  <div class="phead">
+    <div class="fields">
+      <label class="field" id="fOrigin"><b>출발</b><input id="qOrigin" type="search" placeholder="내 위치" autocomplete="off"></label>
+      <label class="field active" id="fDest"><b>도착</b><input id="qDest" type="search" placeholder="목적지 검색" autocomplete="off"></label>
+    </div>
+    <button id="closeSearch" class="textbtn" type="button">닫기</button>
+  </div>
+  <button id="goRoute" class="primary" type="button" disabled>경로 보기</button>
+  <div id="results" class="results"></div>
+</div>
+
+<!-- 설정 -->
+<div id="settingsPanel" class="panel settings" hidden>
+  <div class="phead"><div class="fields"><h3 style="margin:8px 0">설정</h3></div><button id="closeSettings" class="textbtn" type="button">닫기</button></div>
+  <label for="kakaoKey">카카오 REST API 키 (장소 검색·경로)</label>
+  <input id="kakaoKey" type="password" autocomplete="off" placeholder="developers.kakao.com 에서 발급">
+  <label for="corridor">경로에서 몇 km 이내 충전소를 보여줄까요?</label>
+  <input id="corridor" type="number" min="0.5" max="20" step="0.5">
+  <button id="saveSettings" class="primary" type="button">저장</button>
+  <p class="hint">키는 이 기기에만 저장됩니다. 안드로이드 앱은 빌드할 때 키가 들어가므로 따로 입력하지 않아도 됩니다.</p>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-<script>
-// 환경부 API stat 코드
-const STAT = {
-  "1": ["통신이상", "var(--off)"], "2": ["충전대기", "var(--ok)"], "3": ["충전중", "var(--busy)"],
-  "4": ["운영중지", "var(--off)"], "5": ["점검중", "var(--off)"], "9": ["상태미확인", "var(--off)"]
-};
+<script id="app">
+// ───────── 상수 ─────────
+const STAT = { "1": ["통신이상", "var(--off)"], "2": ["충전대기", "var(--ok)"], "3": ["충전중", "var(--busy)"],
+  "4": ["운영중지", "var(--off)"], "5": ["점검중", "var(--off)"], "9": ["상태미확인", "var(--off)"] };
 const TYPE = { "09": "NACS", "10": "DC콤보+NACS" };
+const SC = "슈퍼차저";
+// 운영사 표시 이름 (공공데이터 busiNm → 버튼 이름)
+const OP_ALIAS = { "브라이트에너지파트너스": "워터", "주식회사 펌프킨": "펌프킨" };
+const OP_COLOR = ["#0ea5e9", "#8b5cf6", "#f97316", "#14b8a6", "#ec4899", "#84cc16", "#64748b"];
+const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const REMOTE = "https://raw.githubusercontent.com/noblenook/nacs-map/main/nacs.json";
+const DATA_URL = !isNative && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "nacs.json" : REMOTE;
+const LIVE_KEY = isNative ? window.NACS_KEY : null;
 
+// ───────── 저장소(이 기기) ─────────
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("nacs." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("nacs." + k, JSON.stringify(v)); } catch {} }
+};
+const kakaoKey = () => window.KAKAO_KEY || store.get("kakaoKey", "");
+let corridorKm = store.get("corridorKm", 2);
+
+// ───────── 지도 ─────────
 const map = L.map("map", { zoomControl: false }).setView([36.4, 127.8], 7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19, attribution: "© OpenStreetMap"
-}).addTo(map);
-const cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 });
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+const cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
 map.addLayer(cluster);
+const routeLayer = L.layerGroup().addTo(map);
 
-let stations = [], me = null, meMarker = null, onlyAvail = false, query = "";
 const $ = id => document.getElementById(id);
+let items = [];            // 슈퍼차저 + NACS 충전소 공통 목록
+let ops = [];              // [{name, color, count}]
+let selected = new Set(store.get("ops", null) || []);
+let onlyAvail = store.get("onlyAvail", false);
+let me = null, meMarker = null;
+let route = null;          // {pts:[[lat,lng]], cum:[km], distance, duration, origin, dest}
+let baseTime = "", liveTime = null, firstLoad = true, isSample = false;
 
-function summary(s) {
-  const free = s.chargers.filter(c => c.stat === "2").length;
-  const busy = s.chargers.filter(c => c.stat === "3").length;
-  const color = free ? "var(--ok)" : busy ? "var(--busy)" : "var(--off)";
-  return { free, busy, total: s.chargers.length, color };
-}
+function esc(t) { return String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function fmtKm(km) { return km < 1 ? Math.round(km * 1000) + "m" : km < 100 ? km.toFixed(1) + "km" : Math.round(km) + "km"; }
+function fmtDur(sec) { const m = Math.round(sec / 60); return m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간 ${m % 60}분`; }
 function dist(a, b) {
-  const R = 6371, r = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const R = 6371, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
   const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(x));
 }
-function fmtKm(km) { return km < 1 ? Math.round(km * 1000) + "m" : km.toFixed(1) + "km"; }
-function esc(t) { return String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function fmtTime(t) { return t && t.length >= 12 ? `${t.slice(4, 6)}/${t.slice(6, 8)} ${t.slice(8, 10)}:${t.slice(10, 12)}` : ""; }
+let toastT;
+function toast(msg) { $("toast").textContent = msg; $("toast").hidden = false; clearTimeout(toastT); toastT = setTimeout(() => $("toast").hidden = true, 3500); }
 
-function popupHtml(s) {
-  const rows = s.chargers.map(c => {
+// ───────── 충전소 요약/아이콘/팝업 ─────────
+function summary(it) {
+  if (it.kind === "sc") return { free: null, total: it.stalls, color: "var(--sc)" };
+  const free = it.chargers.filter(c => c.stat === "2").length;
+  const busy = it.chargers.filter(c => c.stat === "3").length;
+  return { free, busy, total: it.chargers.length, color: free ? "var(--ok)" : busy ? "var(--busy)" : "var(--off)" };
+}
+function iconFor(it) {
+  if (it.kind === "sc") return L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
+    html: `<div class="scpin">${it.stalls || "S"}</div>` });
+  return L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
+    html: `<div class="pin" style="background:${it._sum.color}"><span>${it._sum.free}</span></div>` });
+}
+function navLinks(it) {
+  const name = encodeURIComponent(it.name);
+  return `<div class="nav">
+    <a style="background:#fee500;color:#111" href="https://map.kakao.com/link/to/${name},${it.lat},${it.lng}" target="_blank" rel="noopener">카카오맵</a>
+    <a style="background:#03c75a" href="nmap://navigation?dlat=${it.lat}&dlng=${it.lng}&dname=${name}&appname=com.noblenook.nacsmap">네이버</a>
+    <a style="background:#3b5bff" href="tmap://route?goalname=${name}&goalx=${it.lng}&goaly=${it.lat}">T맵</a></div>`;
+}
+function routeLine(it) {
+  return route && it._route ? `<div class="s">출발 후 ${fmtKm(it._route.along)} · 경로에서 ${fmtKm(it._route.off)}</div>` : "";
+}
+function popupHtml(it) {
+  if (it.kind === "sc") {
+    return `<div class="pop"><h4>${esc(it.name)}</h4><div class="s">${esc(it.addr)}</div>${routeLine(it)}
+      <table><tr><td>테슬라 슈퍼차저 · ${it.stalls}기${it.kw ? ` · 최대 ${it.kw}kW` : ""}</td></tr>
+      <tr><td class="s">${it.otherEVs ? "타사 전기차도 이용 가능" : "테슬라 전용"} · 실시간 빈자리는 테슬라 앱에서 확인</td></tr></table>
+      ${navLinks(it)}</div>`;
+  }
+  const rows = it.chargers.map(c => {
     const [label, col] = STAT[c.stat] || ["알수없음", "var(--off)"];
     return `<tr><td>#${esc(c.id)} ${esc(TYPE[c.type] || c.type)}${c.kw ? ` · ${esc(c.kw)}kW` : ""}</td>
       <td style="text-align:right"><span class="badge" style="background:${col}">${label}</span></td></tr>`;
   }).join("");
-  const name = encodeURIComponent(s.name);
   const extra = [
-    s.useTime && `🕒 ${esc(s.useTime)}`,
-    s.parkingFree === "Y" ? "🅿️ 주차 무료" : s.parkingFree === "N" ? "🅿️ 주차 유료" : "",
-    s.limit && `⚠️ ${esc(s.limit)}`,
-    s.note && `ℹ️ ${esc(s.note)}`,
-    s.busi && `${esc(s.busi)}${s.call ? ` · <a href="tel:${esc(s.call)}">${esc(s.call)}</a>` : ""}`
+    it.useTime && `🕒 ${esc(it.useTime)}`,
+    it.parkingFree === "Y" ? "🅿️ 주차 무료" : it.parkingFree === "N" ? "🅿️ 주차 유료" : "",
+    it.limit && `⚠️ ${esc(it.limit)}`, it.note && `ℹ️ ${esc(it.note)}`,
+    `${esc(it.op)}${it.call ? ` · <a href="tel:${esc(it.call)}">${esc(it.call)}</a>` : ""}`
   ].filter(Boolean).join("<br>");
-  return `<div class="pop"><h4>${esc(s.name)}</h4>
-    <div class="s">${esc(s.addr)}${s.loc && s.loc !== "null" ? ` (${esc(s.loc)})` : ""}${me ? ` · ${fmtKm(dist(me, s))}` : ""}</div>
-    <table>${rows}</table>
-    <div class="s">${extra}</div>
-    <div class="nav">
-      <a style="background:#fee500;color:#111" href="https://map.kakao.com/link/to/${name},${s.lat},${s.lng}" target="_blank" rel="noopener">카카오맵</a>
-      <a style="background:#03c75a" href="nmap://navigation?dlat=${s.lat}&dlng=${s.lng}&dname=${name}&appname=nacsmap">네이버</a>
-      <a style="background:#3b5bff" href="tmap://route?goalname=${name}&goalx=${s.lng}&goaly=${s.lat}">T맵</a>
-    </div></div>`;
+  return `<div class="pop"><h4>${esc(it.name)}</h4>
+    <div class="s">${esc(it.addr)}${me ? ` · 내 위치에서 ${fmtKm(dist(me, it))}` : ""}</div>${routeLine(it)}
+    <table>${rows}</table><div class="s">${extra}</div>${navLinks(it)}</div>`;
 }
 
+// ───────── 운영사 버튼 ─────────
+function buildChips() {
+  const opColor = Object.fromEntries(ops.map(o => [o.name, o.color]));
+  $("chips").innerHTML = ops.map(o =>
+    `<button class="chip${selected.has(o.name) ? " on" : ""}" data-op="${esc(o.name)}" type="button">
+      <span class="sw" style="background:${opColor[o.name]}"></span>${esc(o.name)}</button>`).join("") +
+    `<span class="chip sep">|</span><button class="chip${onlyAvail ? " on" : ""}" id="availChip" type="button">NACS 충전가능만</button>`;
+}
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "availChip") { onlyAvail = !onlyAvail; store.set("onlyAvail", onlyAvail); }
+  else { const op = b.dataset.op; selected.has(op) ? selected.delete(op) : selected.add(op); store.set("ops", [...selected]); }
+  buildChips(); render();
+});
+
+// ───────── 경로 계산(경로 근처 충전소) ─────────
+function project(it) {
+  // 경로 위 가장 가까운 지점: 경로에서 떨어진 거리 off, 출발점부터 경로 거리 along (km)
+  const kx = 111.32 * Math.cos(it.lat * Math.PI / 180), ky = 110.57;
+  let best = Infinity, along = 0;
+  const p = route.pts;
+  for (let i = 0; i < p.length - 1; i++) {
+    const ax = (p[i][1] - it.lng) * kx, ay = (p[i][0] - it.lat) * ky;
+    const bx = (p[i + 1][1] - it.lng) * kx, by = (p[i + 1][0] - it.lat) * ky;
+    const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    let t = L2 ? -(ax * dx + ay * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+    const x = ax + t * dx, y = ay + t * dy, d = Math.sqrt(x * x + y * y);
+    if (d < best) { best = d; along = route.cum[i] + t * (route.cum[i + 1] - route.cum[i]); }
+  }
+  return { off: best, along };
+}
+function computeCorridor() {
+  if (!route) { items.forEach(it => it._route = null); return; }
+  const pad = corridorKm / 100 + 0.05;
+  const b = route.bounds;
+  for (const it of items) {
+    it._route = null;
+    if (it.lat < b.s - pad || it.lat > b.n + pad || it.lng < b.w - pad || it.lng > b.e + pad) continue;
+    const r = project(it);
+    if (r.off <= corridorKm) it._route = r;
+  }
+}
+
+// ───────── 화면 그리기 ─────────
 function visible() {
-  const q = query.trim().toLowerCase();
-  return stations.filter(s => (!onlyAvail || s._sum.free > 0) &&
-    (!q || s.name.toLowerCase().includes(q) || s.addr.toLowerCase().includes(q)));
+  return items.filter(it => selected.has(it.op) &&
+    (!route || it._route) &&
+    (!onlyAvail || it.kind === "sc" || it._sum.free > 0));
 }
-
 function render() {
-  cluster.clearLayers();
   const vis = visible();
-  cluster.addLayers(vis.map(s => s._marker));
-  renderList(vis);
+  cluster.clearLayers();
+  cluster.addLayers(vis.map(it => it._marker));
+  renderSheet(vis);
 }
-
-function renderList(vis) {
+function rowHtml(it, right) {
+  const sub = it.kind === "sc" ? `슈퍼차저 · ${it.stalls}기${it.kw ? ` · ${it.kw}kW` : ""}`
+    : `${esc(it.op)} · 충전가능 ${it._sum.free}/${it._sum.total}기`;
+  return `<div class="row" data-id="${esc(it.id)}"><span class="dot${it.kind === "sc" ? " sq" : ""}" style="background:${it._sum.color}"></span>
+    <div class="t"><div class="n">${esc(it.name)}</div><div class="a">${sub}</div></div><div class="d">${right}</div></div>`;
+}
+function renderSheet(vis) {
+  if (route) {
+    const sc = vis.filter(i => i.kind === "sc"), nc = vis.filter(i => i.kind === "nacs");
+    const scStalls = sc.reduce((a, i) => a + i.stalls, 0);
+    const nFree = nc.reduce((a, i) => a + i._sum.free, 0), nTotal = nc.reduce((a, i) => a + i._sum.total, 0);
+    $("sheetTitle").textContent = `${route.origin.name} → ${route.dest.name}`;
+    $("routeBox").innerHTML = `<div class="routeinfo">${fmtKm(route.distance)} · ${fmtDur(route.duration)} · 경로 ${corridorKm}km 이내</div>
+      <div class="summary">
+        <div class="sumcard"><div class="k"><span class="dot sq" style="background:var(--sc)"></span>슈퍼차저</div>
+          <div class="v">${sc.length}곳 <small>총 ${scStalls}기</small></div></div>
+        <div class="sumcard"><div class="k"><span class="dot" style="background:var(--ok)"></span>NACS</div>
+          <div class="v">${nc.length}곳 <small>충전가능 ${nFree}/${nTotal}기</small></div></div>
+      </div>`;
+    const sorted = [...vis].sort((a, b) => a._route.along - b._route.along);
+    $("list").innerHTML = sorted.length ? sorted.map(it => rowHtml(it, `${fmtKm(it._route.along)}<br><small>경로+${fmtKm(it._route.off)}</small>`)).join("")
+      : `<div class="empty">경로 ${corridorKm}km 이내에 선택한 충전소가 없습니다. 위 버튼에서 운영사를 더 선택하거나 설정에서 범위를 넓혀 보세요.</div>`;
+    return;
+  }
+  $("routeBox").innerHTML = "";
   const center = me || map.getCenter();
-  const sorted = vis.map(s => [dist(center, s), s]).sort((a, b) => a[0] - b[0]).slice(0, 30);
-  $("sheetTitle").textContent = query ? `검색 결과 ${vis.length}곳` : me ? "내 주변 NACS 충전소" : "지도 중심 근처 NACS 충전소";
-  $("list").innerHTML = sorted.length ? sorted.map(([d, s]) =>
-    `<div class="row" data-id="${esc(s.id)}"><span class="dot" style="background:${s._sum.color}"></span>
-      <div class="t"><div class="n">${esc(s.name)}</div><div class="a">${esc(s.addr)}</div></div>
-      <div class="d">${fmtKm(d)}<br>${s._sum.free}/${s._sum.total} 가능</div></div>`).join("")
-    : `<div class="empty">조건에 맞는 충전소가 없습니다.</div>`;
+  const sorted = vis.map(it => [dist(center, it), it]).sort((a, b) => a[0] - b[0]).slice(0, 40);
+  $("sheetTitle").textContent = me ? "내 주변 충전소" : "지도 중심 근처 충전소";
+  $("list").innerHTML = sorted.length ? sorted.map(([d, it]) => rowHtml(it, fmtKm(d))).join("")
+    : `<div class="empty">선택한 운영사의 충전소가 없습니다. 위 버튼에서 운영사를 선택하세요.</div>`;
 }
-
 $("list").addEventListener("click", e => {
   const row = e.target.closest(".row"); if (!row) return;
-  const s = stations.find(x => x.id === row.dataset.id); if (!s) return;
+  const it = items.find(x => x.id === row.dataset.id); if (!it) return;
   $("sheet").classList.remove("open");
-  cluster.zoomToShowLayer(s._marker, () => s._marker.openPopup());
+  cluster.zoomToShowLayer(it._marker, () => it._marker.openPopup());
 });
 $("handle").onclick = $("sheetTitle").onclick = () => $("sheet").classList.toggle("open");
-$("avail").onclick = () => { onlyAvail = !onlyAvail; $("avail").classList.toggle("on", onlyAvail); render(); };
-let qt; $("q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value; render(); }, 200); });
-map.on("moveend", () => { if (!me && !query) renderList(visible()); });
+map.on("moveend", () => { if (!me && !route) renderSheet(visible()); });
 
+// ───────── 내 위치 ─────────
 function locate(fly) {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(p => {
-    me = { lat: p.coords.latitude, lng: p.coords.longitude };
-    if (!meMarker) meMarker = L.marker([me.lat, me.lng], { icon: L.divIcon({ className: "", html: '<div class="me"></div>', iconSize: [16, 16] }), interactive: false }).addTo(map);
-    else meMarker.setLatLng([me.lat, me.lng]);
-    if (fly) map.setView([me.lat, me.lng], 13);
-    renderList(visible());
-  }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p => {
+      me = { lat: p.coords.latitude, lng: p.coords.longitude };
+      if (!meMarker) meMarker = L.marker([me.lat, me.lng], { icon: L.divIcon({ className: "", html: '<div class="me"></div>', iconSize: [16, 16] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+      else meMarker.setLatLng([me.lat, me.lng]);
+      if (fly && !route) map.setView([me.lat, me.lng], 13);
+      if (!route) renderSheet(visible());
+      res(me);
+    }, () => res(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  });
 }
-$("locate").onclick = () => locate(true);
+$("locate").onclick = () => locate(true).then(m => { if (m && route) map.setView([m.lat, m.lng], 14); if (!m) toast("위치 권한을 허용해 주세요"); });
 
-// ── 데이터 로딩 & 갱신 ──
-// 앱(APK)·GitHub Pages: GitHub Actions 가 10분마다 갱신하는 저장소의 nacs.json
-// 로컬 개발(localhost): 같은 폴더의 nacs.json
-const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-const REMOTE = "https://raw.githubusercontent.com/noblenook/nacs-map/main/nacs.json";
-const DATA_URL = !isNative && /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "nacs.json" : REMOTE;
-const LIVE_KEY = isNative ? window.NACS_KEY : null;   // APK 빌드 때만 주입됨
-let baseTime = "", liveTime = null, firstLoad = true, isSample = false;
-
-function iconFor(s) {
-  return L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
-    html: `<div class="pin" style="background:${s._sum.color}"><span>${s._sum.free}</span></div>` });
-}
-function refreshStation(s) {
-  const prev = s._sum;
-  s._sum = summary(s);
-  if (!prev || prev.free !== s._sum.free || prev.color !== s._sum.color) s._marker.setIcon(iconFor(s));
-  if (s._marker.isPopupOpen()) s._marker.getPopup().setContent(popupHtml(s));
-}
-function ago(d) {
-  const m = Math.round((Date.now() - d) / 60000);
-  return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
-}
+// ───────── 데이터 로딩 & 실시간 갱신 ─────────
+function opName(busi) { const b = (busi || "").trim(); return OP_ALIAS[b] || b || "기타"; }
+function ago(d) { const m = Math.round((Date.now() - d) / 60000); return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`; }
 function showMeta() {
-  const sample = isSample;
-  const n = stations.reduce((a, s) => a + s.chargers.length, 0);
+  const nc = items.filter(i => i.kind === "nacs"), sc = items.length - nc.length;
   const base = new Date(baseTime.replace(" ", "T") + ":00+09:00");
   const t = liveTime && liveTime > base ? liveTime : base;
-  $("meta").textContent = `${sample ? "⚠️ 샘플 데이터 · " : ""}충전소 ${stations.length}곳 · ${n}기 · 상태 ${isNaN(t) ? baseTime : ago(t)}${liveTime ? " · 실시간" : ""}`;
-  $("meta").classList.toggle("warn", !!sample);
+  $("meta").textContent = `${isSample ? "⚠️ 샘플 · " : ""}NACS ${nc.length}곳 · 슈퍼차저 ${sc}곳 · 상태 ${isNaN(t) ? baseTime : ago(t)}${liveTime ? " · 실시간" : ""}`;
+  $("meta").classList.toggle("warn", isSample);
 }
-
+function refreshItem(it) {
+  const prev = it._sum; it._sum = summary(it);
+  if (!prev || prev.free !== it._sum.free || prev.color !== it._sum.color) it._marker.setIcon(iconFor(it));
+  if (it._marker.isPopupOpen()) it._marker.getPopup().setContent(popupHtml(it));
+}
 async function loadData() {
   const r = await fetch(DATA_URL + (DATA_URL === REMOTE ? `?t=${Math.floor(Date.now() / 60000)}` : ""), { cache: "no-store" });
   const d = await r.json();
-  const old = new Map(stations.map(s => [s.id, s]));
-  stations = d.stations.map(s => {
-    const o = old.get(s.id);
-    if (o) { Object.assign(o, s); refreshStation(o); return o; }
-    s._sum = summary(s);
-    s._marker = L.marker([s.lat, s.lng], { icon: iconFor(s) }).bindPopup(() => popupHtml(s));
-    return s;
+  const old = new Map(items.map(i => [i.id, i]));
+  const fresh = [
+    ...(d.superchargers || []).map(s => ({ ...s, kind: "sc", op: SC })),
+    ...d.stations.map(s => ({ ...s, kind: "nacs", op: opName(s.busi) }))
+  ];
+  items = fresh.map(n => {
+    const o = old.get(n.id);
+    if (o) { Object.assign(o, n); refreshItem(o); return o; }
+    n._sum = summary(n);
+    n._marker = L.marker([n.lat, n.lng], { icon: iconFor(n) }).bindPopup(() => popupHtml(n));
+    return n;
   });
+  // 운영사 버튼: 슈퍼차저 먼저, 이후 NACS 운영사(충전소 많은 순)
+  const cnt = {}; items.forEach(i => cnt[i.op] = (cnt[i.op] || 0) + 1);
+  const names = [SC, ...Object.keys(cnt).filter(n => n !== SC).sort((a, b) => cnt[b] - cnt[a])].filter(n => cnt[n]);
+  const known = new Set(ops.map(o => o.name));
+  ops = names.map((n, i) => ({ name: n, count: cnt[n], color: n === SC ? "var(--sc)" : OP_COLOR[(i - 1) % OP_COLOR.length] }));
+  if (!store.get("ops", null)) selected = new Set(names);                     // 처음엔 전부 선택
+  else names.forEach(n => { if (!known.has(n) && firstLoad === false) selected.add(n); });
+  buildChips();
   baseTime = d.generatedAt; isSample = !!d.sample;
   showMeta();
-  if (firstLoad) { firstLoad = false; render(); locate(true); }
-  else if (stations.length !== old.size) render();
-  else renderList(visible());
+  if (route) computeCorridor();
+  if (firstLoad) { firstLoad = false; render(); locate(!route); }
+  else render();
 }
-
-// APK 전용: 환경부 API 에서 최근 5분 상태 변경을 직접 받아 즉시 반영
 async function liveStatus() {
-  if (!LIVE_KEY || !stations.length) return;
+  if (!LIVE_KEY || !items.length) return;
   const idx = new Map();
-  for (const s of stations) for (const c of s.chargers) idx.set(s.id + "|" + c.id, [s, c]);
+  for (const it of items) if (it.kind === "nacs") for (const c of it.chargers) idx.set(it.id + "|" + c.id, [it, c]);
   const touched = new Set();
   for (let page = 1; page <= 5; page++) {
     const q = new URLSearchParams({ serviceKey: LIVE_KEY, pageNo: page, numOfRows: 9999, period: 5, dataType: "JSON" });
     const d = await (await fetch("https://apis.data.go.kr/B552584/EvCharger/getChargerStatus?" + q)).json();
-    let items = (d.items && d.items.item) || [];
-    if (!Array.isArray(items)) items = [items];
-    for (const it of items) {
-      const hit = idx.get(it.statId + "|" + it.chgerId);
-      if (hit && (it.statUpdDt || "") >= (hit[1].upd || "")) { hit[1].stat = String(it.stat); hit[1].upd = it.statUpdDt || ""; touched.add(hit[0]); }
+    let arr = (d.items && d.items.item) || []; if (!Array.isArray(arr)) arr = [arr];
+    for (const x of arr) {
+      const hit = idx.get(x.statId + "|" + x.chgerId);
+      if (hit && (x.statUpdDt || "") >= (hit[1].upd || "")) { hit[1].stat = String(x.stat); hit[1].upd = x.statUpdDt || ""; touched.add(hit[0]); }
     }
     if (page * 9999 >= (+d.totalCount || 0)) break;
   }
-  touched.forEach(refreshStation);
-  liveTime = new Date();
-  showMeta();
-  renderList(visible());
+  touched.forEach(refreshItem);
+  liveTime = new Date(); showMeta();
+  renderSheet(visible());
 }
-
 async function tick() {
   if (document.hidden) return;
   try { await loadData(); } catch (e) { if (firstLoad) { $("meta").textContent = "데이터를 불러오지 못했습니다. 인터넷 연결을 확인하세요"; $("meta").classList.add("warn"); } }
   try { await liveStatus(); } catch (e) { /* 실시간 실패 시 10분 단위 데이터로 계속 */ }
 }
+
+// ───────── 카카오 API ─────────
+async function kakao(url) {
+  const key = kakaoKey();
+  if (!key) { openSettings("장소 검색과 경로 안내에는 카카오 REST API 키가 필요합니다"); throw new Error("no key"); }
+  const r = await fetch(url, { headers: { Authorization: "KakaoAK " + key } });
+  if (r.status === 401 || r.status === 403) { toast("카카오 키가 올바르지 않거나 카카오맵 사용 설정이 꺼져 있습니다"); throw new Error("auth"); }
+  if (!r.ok) throw new Error("kakao " + r.status);
+  return r.json();
+}
+async function searchPlaces(q) {
+  const near = me ? `&x=${me.lng}&y=${me.lat}` : "";
+  const d = await kakao(`https://dapi.kakao.com/v2/local/search/keyword.json?size=12&query=${encodeURIComponent(q)}${near}`);
+  let res = d.documents.map(p => ({ name: p.place_name, addr: p.road_address_name || p.address_name, lat: +p.y, lng: +p.x }));
+  if (!res.length) {
+    const a = await kakao(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(q)}`);
+    res = a.documents.map(p => ({ name: p.address_name, addr: p.road_address ? p.road_address.address_name : "", lat: +p.y, lng: +p.x }));
+  }
+  return res;
+}
+async function getRoute(o, dst) {
+  const d = await kakao(`https://apis-navi.kakaomobility.com/v1/directions?origin=${o.lng},${o.lat}&destination=${dst.lng},${dst.lat}&priority=RECOMMEND`);
+  const r = d.routes && d.routes[0];
+  if (!r || r.result_code !== 0) throw new Error((r && r.result_msg) || "경로를 찾지 못했습니다");
+  const pts = [];
+  for (const s of r.sections) for (const road of s.roads) for (let i = 0; i < road.vertexes.length; i += 2) pts.push([road.vertexes[i + 1], road.vertexes[i]]);
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist({ lat: pts[i - 1][0], lng: pts[i - 1][1] }, { lat: pts[i][0], lng: pts[i][1] }));
+  let n = -90, s = 90, e = -180, w = 180;
+  for (const [la, ln] of pts) { n = Math.max(n, la); s = Math.min(s, la); e = Math.max(e, ln); w = Math.min(w, ln); }
+  return { pts, cum, bounds: { n, s, e, w }, distance: r.summary.distance / 1000, duration: r.summary.duration };
+}
+
+// ───────── 경로 안내 ─────────
+async function showRoute(origin, dest) {
+  toast("경로 계산 중…");
+  try {
+    if (!origin) {
+      const m = me || await locate(false);
+      if (!m) { toast("현재 위치를 알 수 없습니다. 출발지를 입력하세요"); openSearch(); return; }
+      origin = { name: "내 위치", lat: m.lat, lng: m.lng };
+    }
+    const r = await getRoute(origin, dest);
+    route = { ...r, origin, dest };
+    routeLayer.clearLayers();
+    L.polyline(r.pts, { color: getComputedStyle(document.documentElement).getPropertyValue("--route").trim() || "#2563eb", weight: 6, opacity: .85 }).addTo(routeLayer);
+    const end = (t, bg) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="endpin" style="background:${bg}">${t}</div>` });
+    L.marker([origin.lat, origin.lng], { icon: end("출", "#16a34a"), interactive: false }).addTo(routeLayer);
+    L.marker([dest.lat, dest.lng], { icon: end("도", "#e31937"), interactive: false }).addTo(routeLayer);
+    computeCorridor();
+    $("destLabel").textContent = `${dest.name}`; $("destLabel").className = "val";
+    $("clearRoute").hidden = false;
+    render();
+    map.fitBounds([[r.bounds.s, r.bounds.w], [r.bounds.n, r.bounds.e]], { paddingTopLeft: [20, 120], paddingBottomRight: [20, 210] });
+    $("toast").hidden = true;
+  } catch (e) {
+    if (e.message !== "no key" && e.message !== "auth") toast("경로를 찾지 못했습니다: " + e.message);
+  }
+}
+function clearRoute() {
+  route = null; routeLayer.clearLayers(); computeCorridor();
+  $("destLabel").textContent = "목적지 검색 · 경로 위 충전소 보기"; $("destLabel").className = "ph";
+  $("clearRoute").hidden = true; render();
+}
+$("clearRoute").onclick = clearRoute;
+
+// ───────── 검색 패널 ─────────
+let pick = { origin: null, dest: null }, activeField = "dest", searchT;
+function openSearch() {
+  $("searchPanel").hidden = false;
+  $("qOrigin").value = pick.origin ? pick.origin.name : "";
+  $("qDest").value = pick.dest ? pick.dest.name : "";
+  setActive("dest"); $("qDest").focus(); updateGo();
+  if (!$("qDest").value) $("results").innerHTML = `<div class="hint">목적지를 입력하세요. 출발지를 비워두면 내 위치에서 출발합니다.<br>카카오맵·네이버지도·테스맵에서 장소를 <b>공유 → NACS 충전지도</b>로 보내도 바로 경로가 열립니다(안드로이드 앱).</div>`;
+}
+function setActive(f) { activeField = f; $("fOrigin").classList.toggle("active", f === "origin"); $("fDest").classList.toggle("active", f === "dest"); }
+function updateGo() { $("goRoute").disabled = !pick.dest; }
+$("openSearch").onclick = openSearch;
+$("closeSearch").onclick = () => $("searchPanel").hidden = true;
+for (const f of ["origin", "dest"]) {
+  const inp = $(f === "origin" ? "qOrigin" : "qDest");
+  inp.addEventListener("focus", () => setActive(f));
+  inp.addEventListener("input", () => {
+    pick[f] = null; updateGo();
+    clearTimeout(searchT);
+    const q = inp.value.trim();
+    if (!q) { $("results").innerHTML = ""; return; }
+    searchT = setTimeout(() => doSearch(q, f), 300);
+  });
+}
+async function doSearch(q, f) {
+  const ql = q.toLowerCase();
+  const chargerHits = items.filter(it => it.name.toLowerCase().includes(ql)).slice(0, 5)
+    .map(it => ({ name: it.name, addr: it.kind === "sc" ? "슈퍼차저" : `NACS · ${it.op}`, lat: it.lat, lng: it.lng }));
+  let places = [];
+  try { places = await searchPlaces(q); } catch (e) { if (e.message === "no key") return; }
+  const all = [...places, ...chargerHits];
+  window._results = all;
+  $("results").innerHTML = all.length ? all.map((p, i) =>
+    `<div class="row" data-i="${i}"><div class="t"><div class="n">${esc(p.name)}</div><div class="a">${esc(p.addr)}</div></div>
+     <div class="d">${me ? fmtKm(dist(me, p)) : ""}</div></div>`).join("") : `<div class="hint">검색 결과가 없습니다.</div>`;
+}
+$("results").addEventListener("click", e => {
+  const row = e.target.closest(".row"); if (!row) return;
+  const p = window._results[+row.dataset.i];
+  pick[activeField] = p;
+  $(activeField === "origin" ? "qOrigin" : "qDest").value = p.name;
+  updateGo();
+  if (activeField === "dest") { $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest); }
+  else { setActive("dest"); $("qDest").focus(); $("results").innerHTML = ""; }
+});
+$("goRoute").onclick = () => { $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest); };
+
+// ───────── 설정 ─────────
+function openSettings(msg) {
+  $("settingsPanel").hidden = false;
+  $("kakaoKey").value = store.get("kakaoKey", "");
+  $("kakaoKey").placeholder = window.KAKAO_KEY ? "앱에 내장된 키 사용 중" : "developers.kakao.com 에서 발급";
+  $("corridor").value = corridorKm;
+  if (msg) toast(msg);
+}
+$("openSettings").onclick = () => openSettings();
+$("closeSettings").onclick = () => $("settingsPanel").hidden = true;
+$("saveSettings").onclick = () => {
+  store.set("kakaoKey", $("kakaoKey").value.trim());
+  const c = parseFloat($("corridor").value); if (c > 0 && c <= 20) { corridorKm = c; store.set("corridorKm", c); }
+  $("settingsPanel").hidden = true;
+  if (route) { computeCorridor(); render(); }
+  toast("저장했습니다");
+};
+
+// ───────── 다른 앱에서 공유받은 목적지 (안드로이드) ─────────
+async function handleShared(text) {
+  if (!text) return;
+  text = String(text);
+  // 1) 좌표가 들어있는 경우 (geo:37.5,127.0 / ...?q=37.5,127.0 등)
+  const c = text.match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{2,3}\.\d{3,})/);
+  const label = decodeURIComponent((text.match(/[?&]q=([^&]+)/) || [])[1] || "").replace(/^[-\d.,\s]+/, "").replace(/\+/g, " ").trim();
+  if (c && +c[1] > 32 && +c[1] < 39.5) {
+    return showRoute(null, { name: label || "공유된 위치", lat: +c[1], lng: +c[2] });
+  }
+  // 2) 장소 이름/주소 텍스트
+  const lines = text.replace(/https?:\/\/\S+/g, "").split(/\n/).map(s => s.replace(/^\[[^\]]*\]\s*/, "").trim()).filter(Boolean);
+  for (const q of [...lines, lines.join(" ")]) {
+    if (!q) continue;
+    try {
+      const r = await searchPlaces(q);
+      if (r.length) { toast(`목적지: ${r[0].name}`); return showRoute(null, r[0]); }
+    } catch (e) { if (e.message === "no key" || e.message === "auth") return; }
+  }
+  // 3) 링크만 온 경우: 링크를 열어 제목/좌표를 찾음
+  const url = (text.match(/https?:\/\/\S+/) || [])[0];
+  if (url) {
+    try {
+      const r = await fetch(url);
+      const cc = (r.url || "").match(/(-?\d{1,2}\.\d{3,})[,/](-?\d{2,3}\.\d{3,})/);
+      if (cc && +cc[1] > 32 && +cc[1] < 39.5) return showRoute(null, { name: "공유된 위치", lat: +cc[1], lng: +cc[2] });
+      const html = await r.text();
+      const t = (html.match(/property="og:title"\s+content="([^"]+)"/) || [])[1];
+      if (t) { const p = await searchPlaces(t); if (p.length) return showRoute(null, p[0]); }
+    } catch (e) {}
+  }
+  toast("공유된 내용에서 목적지를 찾지 못했습니다");
+  pick.dest = null; openSearch(); $("qDest").value = lines[0] || ""; if (lines[0]) doSearch(lines[0], "dest");
+}
+async function initShare() {
+  const P = isNative && window.Capacitor.Plugins && window.Capacitor.Plugins.ShareIn;
+  if (!P) return;
+  P.addListener("share", d => handleShared(d && d.text));
+  try { const d = await P.getPending(); if (d && d.text) { await waitData(); handleShared(d.text); } } catch (e) {}
+}
+function waitData() { return new Promise(res => { const t = setInterval(() => { if (items.length) { clearInterval(t); res(); } }, 200); setTimeout(() => { clearInterval(t); res(); }, 15000); }); }
+
+// ───────── 시작 ─────────
 tick();
 setInterval(tick, (LIVE_KEY ? 2 : 3) * 60000);
-setInterval(() => stations.length && showMeta(), 30000);
+setInterval(() => items.length && showMeta(), 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+initShare();
 </script>
 </body>
 </html>
