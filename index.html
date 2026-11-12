@@ -106,7 +106,8 @@ button{font:inherit;color:inherit}
 .rchip.on{border-color:var(--route);box-shadow:inset 0 0 0 1px var(--route)}
 .vialine{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:6px}
 .vialine span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vialine button,.vbtn{border:0;border-radius:8px;background:var(--panel2);color:var(--text);font-size:12px;font-weight:700;padding:6px 10px;cursor:pointer}
+.vialine button,.vbtn{border:0;border-radius:8px;background:var(--panel2);color:var(--text);font-size:12px;font-weight:700;padding:6px 10px;cursor:pointer;flex:none}
+.vialine button.cancel{background:var(--sc);color:#fff}
 .vbtn{width:100%;margin-top:6px;padding:8px}
 .results{flex:1;overflow:auto;margin-top:10px}
 .results .row:first-child{border-top:0}
@@ -127,7 +128,7 @@ button{font:inherit;color:inherit}
 <div class="top">
   <div class="bar">
     <button id="openSearch" class="search" type="button"><span>🔍</span><span id="destLabel" class="ph">목적지 검색 · 경로 위 충전소 보기</span></button>
-    <button id="clearRoute" class="iconbtn" type="button" aria-label="경로 지우기" hidden>✕</button>
+    <button id="clearRoute" class="iconbtn" type="button" aria-label="경로 취소" title="경로 취소" hidden>✕</button>
     <button id="openSettings" class="iconbtn" type="button" aria-label="설정">⚙</button>
   </div>
   <div id="chips" class="chips"></div>
@@ -638,12 +639,13 @@ function routeChips() {
 function viaLine() {
   const names = trip.vias.map((v, i) => `${i + 1}. ${v.name}`).join("  ");
   return `<div class="vialine"><span>${trip.vias.length ? "경유 " + esc(names) : "원하는 길이 없으면 경유지를 넣으세요 (지도 길게 누르기)"}</span>
-    <button data-edit-trip type="button">경유지 편집</button></div>`;
+    <button data-edit-trip type="button">경유지 편집</button><button data-cancel-route class="cancel" type="button">경로 취소</button></div>`;
 }
 document.addEventListener("click", e => {
   const rc = e.target.closest("[data-route]");
   if (rc) return selectRoute(+rc.dataset.route);
   if (e.target.closest("[data-edit-trip]")) return openSearch();
+  if (e.target.closest("[data-cancel-route]")) { clearRoute(); toast("경로를 취소했습니다"); return; }
   const dv = e.target.closest("[data-del-via]");
   if (dv) { map.closePopup(); const v = trip.vias.filter((_, i) => i !== +dv.dataset.delVia); return showRoute(trip.origin.isMe ? null : trip.origin, trip.dest, v); }
   const av = e.target.closest("[data-via-id],[data-via-ll]");
@@ -673,7 +675,21 @@ function clearRoute() {
   $("destLabel").textContent = "목적지 검색 · 경로 위 충전소 보기"; $("destLabel").className = "ph";
   $("clearRoute").hidden = true; render();
 }
-$("clearRoute").onclick = clearRoute;
+$("clearRoute").onclick = () => { clearRoute(); toast("경로를 취소했습니다"); };
+
+// 안드로이드 뒤로 버튼: 열린 화면 닫기 → 팝업 닫기 → 경로 취소 → 앱 나가기
+(function initBack() {
+  const App = isNative && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (!App) return;
+  App.addListener("backButton", () => {
+    if (!$("settingsPanel").hidden) return $("settingsPanel").hidden = true;
+    if (!$("searchPanel").hidden) return $("searchPanel").hidden = true;
+    if (map._popup && map.hasLayer(map._popup)) return map.closePopup();
+    if ($("sheet").classList.contains("open")) return $("sheet").classList.remove("open");
+    if (trip) { clearRoute(); return toast("경로를 취소했습니다"); }
+    App.exitApp();
+  });
+})();
 
 // ───────── 검색 패널 (출발 · 경유 1~5 · 도착) ─────────
 let pick = { origin: null, dest: null, vias: [] }, activeField = "dest", searchT;
