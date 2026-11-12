@@ -97,6 +97,17 @@ button{font:inherit;color:inherit}
 .field b{font-size:12px;color:var(--muted);flex:none;width:28px}
 .field input{flex:1;border:0;background:transparent;color:var(--text);font-size:16px;padding:11px 0;outline:none;min-width:0}
 .textbtn{border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:600;padding:10px 6px;cursor:pointer}
+.addvia{align-self:flex-start;color:var(--route);padding:8px 2px 0}
+.field .x{border:0;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;padding:6px}
+.rchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:2px 0 8px}
+.rchips::-webkit-scrollbar{display:none}
+.rchip{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 10px;text-align:left;cursor:pointer;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rchip b{display:block;font-size:13px;color:var(--text)}
+.rchip.on{border-color:var(--route);box-shadow:inset 0 0 0 1px var(--route)}
+.vialine{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.vialine span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vialine button,.vbtn{border:0;border-radius:8px;background:var(--panel2);color:var(--text);font-size:12px;font-weight:700;padding:6px 10px;cursor:pointer}
+.vbtn{width:100%;margin-top:6px;padding:8px}
 .results{flex:1;overflow:auto;margin-top:10px}
 .results .row:first-child{border-top:0}
 .primary{border:0;border-radius:10px;background:var(--route);color:#fff;font-weight:700;font-size:15px;padding:12px;cursor:pointer;margin-top:8px}
@@ -134,12 +145,10 @@ button{font:inherit;color:inherit}
 <!-- 출발지·목적지 검색 -->
 <div id="searchPanel" class="panel" hidden>
   <div class="phead">
-    <div class="fields">
-      <label class="field" id="fOrigin"><b>출발</b><input id="qOrigin" type="search" placeholder="내 위치" autocomplete="off"></label>
-      <label class="field active" id="fDest"><b>도착</b><input id="qDest" type="search" placeholder="목적지 검색" autocomplete="off"></label>
-    </div>
+    <div class="fields" id="fields"></div>
     <button id="closeSearch" class="textbtn" type="button">닫기</button>
   </div>
+  <button id="addVia" class="textbtn addvia" type="button">＋ 경유지 추가</button>
   <button id="goRoute" class="primary" type="button" disabled>경로 보기</button>
   <div id="results" class="results"></div>
 </div>
@@ -229,7 +238,9 @@ function navLinks(it) {
     <a style="background:#3b5bff" href="tmap://route?goalname=${name}&goalx=${it.lng}&goaly=${it.lat}">T맵</a></div>`;
 }
 function routeLine(it) {
-  return route && it._route ? `<div class="s">출발 후 ${fmtKm(it._route.along)} · 경로에서 ${fmtKm(it._route.off)}</div>` : "";
+  if (!route) return "";
+  return (it._route ? `<div class="s">출발 후 ${fmtKm(it._route.along)} · 경로에서 ${fmtKm(it._route.off)}</div>` : "") +
+    `<button class="vbtn" data-via-id="${esc(it.id)}" type="button">이 충전소를 경유지로 추가</button>`;
 }
 function popupHtml(it) {
   if (it.kind === "sc") {
@@ -406,7 +417,7 @@ function renderSheet(vis) {
     const scStalls = sc.reduce((a, i) => a + i.stalls, 0);
     const nFree = nc.reduce((a, i) => a + i._sum.free, 0), nTotal = nc.reduce((a, i) => a + i._sum.total, 0);
     $("sheetTitle").textContent = `${route.origin.name} → ${route.dest.name}`;
-    $("routeBox").innerHTML = `<div class="routeinfo">${fmtKm(route.distance)} · ${fmtDur(route.duration)} · 진행 방향 ${corridorKm}km 이내${route.opposite ? ` · 반대편 ${route.opposite}곳 제외` : ""}</div>
+    $("routeBox").innerHTML = `${routeChips()}${viaLine()}<div class="routeinfo">${fmtKm(route.distance)} · ${fmtDur(route.duration)} · 진행 방향 ${corridorKm}km 이내${route.opposite ? ` · 반대편 ${route.opposite}곳 제외` : ""}</div>
       <div class="summary">
         <div class="sumcard"><div class="k"><span class="dot sq" style="background:var(--sc)"></span>슈퍼차저</div>
           <div class="v">${sc.length}곳 <small>총 ${scStalls}기</small></div></div>
@@ -538,77 +549,173 @@ async function searchPlaces(q) {
   }
   return res;
 }
-async function getRoute(o, dst) {
-  const d = await kakao(`https://apis-navi.kakaomobility.com/v1/directions?origin=${o.lng},${o.lat}&destination=${dst.lng},${dst.lat}&priority=RECOMMEND`);
-  const r = d.routes && d.routes[0];
-  if (!r || r.result_code !== 0) throw new Error((r && r.result_msg) || "경로를 찾지 못했습니다");
+function parseRoute(r) {
   const pts = [];
   for (const s of r.sections) for (const road of s.roads) for (let i = 0; i < road.vertexes.length; i += 2) pts.push([road.vertexes[i + 1], road.vertexes[i]]);
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist({ lat: pts[i - 1][0], lng: pts[i - 1][1] }, { lat: pts[i][0], lng: pts[i][1] }));
   let n = -90, s = 90, e = -180, w = 180;
   for (const [la, ln] of pts) { n = Math.max(n, la); s = Math.min(s, la); e = Math.max(e, ln); w = Math.min(w, ln); }
-  return { pts, cum, bounds: { n, s, e, w }, distance: r.summary.distance / 1000, duration: r.summary.duration };
+  const fare = r.summary.fare || {};
+  return { pts, cum, bounds: { n, s, e, w }, distance: r.summary.distance / 1000, duration: r.summary.duration, toll: fare.toll || 0 };
+}
+// 추천·최소시간·최단거리(+경유지 없으면 대안 경로)를 함께 받아 겹치는 것은 하나로
+const PRIORITY = [["RECOMMEND", "추천"], ["TIME", "최소시간"], ["DISTANCE", "최단거리"]];
+async function getRoutes(o, dst, vias) {
+  let base = `https://apis-navi.kakaomobility.com/v1/directions?origin=${o.lng},${o.lat}&destination=${dst.lng},${dst.lat}`;
+  if (vias.length) base += "&waypoints=" + encodeURIComponent(vias.map(v => `${v.lng},${v.lat}`).join("|"));
+  let lastMsg = "";
+  const res = await Promise.all(PRIORITY.map(([p, label]) =>
+    kakao(`${base}&priority=${p}${!vias.length && p === "RECOMMEND" ? "&alternatives=true" : ""}`)
+      .then(d => ({ d, label }))
+      .catch(e => { if (e.message === "no key" || e.message === "auth") throw e; lastMsg = e.message; return null; })));
+  const out = []; let alt = 0;
+  for (const x of res) {
+    if (!x) continue;
+    (x.d.routes || []).forEach((r, i) => {
+      if (r.result_code !== 0) { lastMsg = r.result_msg || lastMsg; return; }
+      const pr = parseRoute(r);
+      const dup = out.find(q => Math.abs(q.distance - pr.distance) < 0.5 && Math.abs(q.duration - pr.duration) < 90);
+      if (dup) { if (i === 0 && !dup.labels.includes(x.label)) dup.labels.push(x.label); return; }
+      pr.labels = [i === 0 ? x.label : `대안 ${++alt}`];
+      out.push(pr);
+    });
+  }
+  if (!out.length) throw new Error(lastMsg || "경로를 찾지 못했습니다");
+  return out;
 }
 
 // ───────── 경로 안내 ─────────
-async function showRoute(origin, dest) {
+let routes = [], routeIdx = 0, trip = null;   // trip = {origin, dest, vias}
+const routeColor = () => getComputedStyle(document.documentElement).getPropertyValue("--route").trim() || "#2563eb";
+async function showRoute(origin, dest, vias = []) {
   toast("경로 계산 중…");
+  pick = { origin, dest, vias: [...vias] };
   try {
     if (!origin) {
       const m = me || await locate(false);
       if (!m) { toast("현재 위치를 알 수 없습니다. 출발지를 입력하세요"); openSearch(); return; }
-      origin = { name: "내 위치", lat: m.lat, lng: m.lng };
+      origin = { name: "내 위치", lat: m.lat, lng: m.lng, isMe: true };
     }
-    const r = await getRoute(origin, dest);
-    route = { ...r, origin, dest };
-    routeLayer.clearLayers();
-    L.polyline(r.pts, { color: getComputedStyle(document.documentElement).getPropertyValue("--route").trim() || "#2563eb", weight: 6, opacity: .85 }).addTo(routeLayer);
-    const end = (t, bg) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="endpin" style="background:${bg}">${t}</div>` });
-    L.marker([origin.lat, origin.lng], { icon: end("출", "#16a34a"), interactive: false }).addTo(routeLayer);
-    L.marker([dest.lat, dest.lng], { icon: end("도", "#e31937"), interactive: false }).addTo(routeLayer);
-    computeCorridor();
-    $("destLabel").textContent = `${dest.name}`; $("destLabel").className = "val";
+    routes = await getRoutes(origin, dest, vias);
+    trip = { origin, dest, vias: [...vias] };
+    $("destLabel").textContent = vias.length ? `${dest.name} (경유 ${vias.length})` : dest.name; $("destLabel").className = "val";
     $("clearRoute").hidden = false;
-    render();
-    map.fitBounds([[r.bounds.s, r.bounds.w], [r.bounds.n, r.bounds.e]], { paddingTopLeft: [20, 120], paddingBottomRight: [20, 210] });
+    selectRoute(0, true);
     $("toast").hidden = true;
   } catch (e) {
     if (e.message !== "no key" && e.message !== "auth") toast("경로를 찾지 못했습니다: " + e.message);
   }
 }
+function selectRoute(i, fit) {
+  routeIdx = i;
+  route = { ...routes[i], ...trip };
+  computeCorridor();
+  drawRoutes();
+  render();
+  if (fit) { const b = route.bounds; map.fitBounds([[b.s, b.w], [b.n, b.e]], { paddingTopLeft: [20, 120], paddingBottomRight: [20, 210] }); }
+}
+function drawRoutes() {
+  routeLayer.clearLayers();
+  routes.forEach((r, i) => {
+    if (i === routeIdx) return;
+    L.polyline(r.pts, { color: "#9ca3af", weight: 5, opacity: .7 }).on("click", () => selectRoute(i)).addTo(routeLayer)
+      .bindTooltip(`${r.labels.join("·")} ${fmtKm(r.distance)} · ${fmtDur(r.duration)}`, { sticky: true });
+  });
+  L.polyline(route.pts, { color: routeColor(), weight: 7, opacity: .9 }).addTo(routeLayer);
+  const pin = (t, bg) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="endpin" style="background:${bg}">${t}</div>` });
+  L.marker([trip.origin.lat, trip.origin.lng], { icon: pin("출", "#16a34a"), interactive: false }).addTo(routeLayer);
+  trip.vias.forEach((v, i) => L.marker([v.lat, v.lng], { icon: pin(i + 1, "#7c3aed") })
+    .bindPopup(`<div class="pop"><h4>경유지 ${i + 1}</h4><div class="s">${esc(v.name)}</div><button class="vbtn" data-del-via="${i}" type="button">경유지 삭제</button></div>`)
+    .addTo(routeLayer));
+  L.marker([trip.dest.lat, trip.dest.lng], { icon: pin("도", "#e31937"), interactive: false }).addTo(routeLayer);
+}
+function routeChips() {
+  if (routes.length < 2) return "";
+  return `<div class="rchips">${routes.map((r, i) => `<button class="rchip${i === routeIdx ? " on" : ""}" data-route="${i}" type="button">
+    <b>${esc(r.labels.join("·"))}</b>${fmtKm(r.distance)} · ${fmtDur(r.duration)}${r.toll ? ` · 통행료 ${r.toll.toLocaleString()}원` : ""}</button>`).join("")}</div>`;
+}
+function viaLine() {
+  const names = trip.vias.map((v, i) => `${i + 1}. ${v.name}`).join("  ");
+  return `<div class="vialine"><span>${trip.vias.length ? "경유 " + esc(names) : "원하는 길이 없으면 경유지를 넣으세요 (지도 길게 누르기)"}</span>
+    <button data-edit-trip type="button">경유지 편집</button></div>`;
+}
+document.addEventListener("click", e => {
+  const rc = e.target.closest("[data-route]");
+  if (rc) return selectRoute(+rc.dataset.route);
+  if (e.target.closest("[data-edit-trip]")) return openSearch();
+  const dv = e.target.closest("[data-del-via]");
+  if (dv) { map.closePopup(); const v = trip.vias.filter((_, i) => i !== +dv.dataset.delVia); return showRoute(trip.origin.isMe ? null : trip.origin, trip.dest, v); }
+  const av = e.target.closest("[data-via-id],[data-via-ll]");
+  if (av) {
+    map.closePopup();
+    let p;
+    if (av.dataset.viaId) { const it = items.find(x => x.id === av.dataset.viaId); p = it && { name: it.name, lat: it.lat, lng: it.lng }; }
+    else { const [la, ln] = av.dataset.viaLl.split(",").map(Number); p = { name: "지도에서 선택한 지점", lat: la, lng: ln }; }
+    if (p) addVia(p);
+  }
+});
+// 경유지는 현재 경로에서 지나는 순서대로 끼워 넣음
+function addVia(p) {
+  if (!trip) return;
+  if (trip.vias.length >= 5) return toast("경유지는 5곳까지 넣을 수 있습니다");
+  const vias = [...trip.vias, p].map(v => ({ v, a: project(v).along })).sort((x, y) => x.a - y.a).map(x => x.v);
+  showRoute(trip.origin.isMe ? null : trip.origin, trip.dest, vias);
+}
+map.on("contextmenu", e => {
+  if (!trip) return;
+  L.popup().setLatLng(e.latlng).setContent(`<div class="pop"><div class="s">이 지점을 거쳐 가는 경로로 바꿉니다</div>
+    <button class="vbtn" data-via-ll="${e.latlng.lat.toFixed(6)},${e.latlng.lng.toFixed(6)}" type="button">여기를 경유지로 추가</button></div>`).openOn(map);
+});
 function clearRoute() {
-  route = null; routeLayer.clearLayers(); computeCorridor();
+  route = null; routes = []; trip = null; routeLayer.clearLayers(); computeCorridor();
+  pick = { origin: null, dest: null, vias: [] };
   $("destLabel").textContent = "목적지 검색 · 경로 위 충전소 보기"; $("destLabel").className = "ph";
   $("clearRoute").hidden = true; render();
 }
 $("clearRoute").onclick = clearRoute;
 
-// ───────── 검색 패널 ─────────
-let pick = { origin: null, dest: null }, activeField = "dest", searchT;
-function openSearch() {
-  $("searchPanel").hidden = false;
-  $("qOrigin").value = pick.origin ? pick.origin.name : "";
-  $("qDest").value = pick.dest ? pick.dest.name : "";
-  setActive("dest"); $("qDest").focus(); updateGo();
-  if (!$("qDest").value) $("results").innerHTML = `<div class="hint">목적지를 입력하세요. 출발지를 비워두면 내 위치에서 출발합니다.<br>카카오맵·네이버지도·테스맵에서 장소를 <b>공유 → NACS</b>로 보내도 바로 경로가 열립니다(안드로이드 앱).</div>`;
+// ───────── 검색 패널 (출발 · 경유 1~5 · 도착) ─────────
+let pick = { origin: null, dest: null, vias: [] }, activeField = "dest", searchT;
+const getPick = k => k === "origin" ? pick.origin : k === "dest" ? pick.dest : pick.vias[+k.slice(1)];
+function setPick(k, p) { if (k === "origin") pick.origin = p; else if (k === "dest") pick.dest = p; else pick.vias[+k.slice(1)] = p; }
+function renderFields() {
+  const f = (key, label, ph, removable) => `<label class="field${key === activeField ? " active" : ""}" data-key="${key}"><b>${label}</b>
+    <input data-key="${key}" type="search" placeholder="${ph}" autocomplete="off" value="${esc(getPick(key) ? getPick(key).name : "")}">
+    ${removable ? `<button class="x" data-rm="${key}" type="button" aria-label="경유지 삭제">✕</button>` : ""}</label>`;
+  $("fields").innerHTML = f("origin", "출발", "내 위치", false) +
+    pick.vias.map((v, i) => f("v" + i, "경유" + (i + 1), "경유지 검색", true)).join("") +
+    f("dest", "도착", "목적지 검색", false);
+  $("addVia").hidden = pick.vias.length >= 5;
+  updateGo();
 }
-function setActive(f) { activeField = f; $("fOrigin").classList.toggle("active", f === "origin"); $("fDest").classList.toggle("active", f === "dest"); }
-function updateGo() { $("goRoute").disabled = !pick.dest; }
+function setActive(k) { activeField = k; $("fields").querySelectorAll(".field").forEach(el => el.classList.toggle("active", el.dataset.key === k)); }
+function focusField(k) { setActive(k); const el = $("fields").querySelector(`input[data-key="${k}"]`); if (el) el.focus(); }
+function updateGo() { $("goRoute").disabled = !pick.dest || pick.vias.some(v => !v); }
+function openSearch() {
+  if (trip) pick = { origin: trip.origin.isMe ? null : trip.origin, dest: trip.dest, vias: [...trip.vias] };
+  $("searchPanel").hidden = false;
+  activeField = "dest";
+  renderFields(); focusField(activeField);
+  $("results").innerHTML = pick.dest ? "" : `<div class="hint">목적지를 입력하세요. 출발지를 비워두면 내 위치에서 출발합니다.<br>원하는 길로 가려면 <b>＋ 경유지 추가</b>로 그 길의 휴게소나 IC 를 넣으세요.<br>카카오맵·네이버지도·테스맵에서 장소를 <b>공유 → NACS</b>로 보내도 바로 경로가 열립니다(안드로이드 앱).</div>`;
+}
 $("openSearch").onclick = openSearch;
 $("closeSearch").onclick = () => $("searchPanel").hidden = true;
-for (const f of ["origin", "dest"]) {
-  const inp = $(f === "origin" ? "qOrigin" : "qDest");
-  inp.addEventListener("focus", () => setActive(f));
-  inp.addEventListener("input", () => {
-    pick[f] = null; updateGo();
-    clearTimeout(searchT);
-    const q = inp.value.trim();
-    if (!q) { $("results").innerHTML = ""; return; }
-    searchT = setTimeout(() => doSearch(q, f), 300);
-  });
-}
-async function doSearch(q, f) {
+$("addVia").onclick = () => { pick.vias.push(null); activeField = "v" + (pick.vias.length - 1); renderFields(); focusField(activeField); $("results").innerHTML = ""; };
+$("fields").addEventListener("click", e => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) { e.preventDefault(); pick.vias.splice(+rm.dataset.rm.slice(1), 1); activeField = "dest"; renderFields(); }
+});
+$("fields").addEventListener("focusin", e => { const k = e.target.dataset && e.target.dataset.key; if (k) setActive(k); });
+$("fields").addEventListener("input", e => {
+  const k = e.target.dataset.key; if (!k) return;
+  setPick(k, null); updateGo();
+  clearTimeout(searchT);
+  const q = e.target.value.trim();
+  if (!q) { $("results").innerHTML = ""; return; }
+  searchT = setTimeout(() => doSearch(q), 300);
+});
+async function doSearch(q) {
   const ql = q.toLowerCase();
   const chargerHits = items.filter(it => it.name.toLowerCase().includes(ql)).slice(0, 5)
     .map(it => ({ name: it.name, addr: it.kind === "sc" ? "슈퍼차저" : `NACS · ${it.op}`, lat: it.lat, lng: it.lng }));
@@ -622,14 +729,18 @@ async function doSearch(q, f) {
 }
 $("results").addEventListener("click", e => {
   const row = e.target.closest(".row"); if (!row) return;
-  const p = window._results[+row.dataset.i];
-  pick[activeField] = p;
-  $(activeField === "origin" ? "qOrigin" : "qDest").value = p.name;
-  updateGo();
-  if (activeField === "dest") { $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest); }
-  else { setActive("dest"); $("qDest").focus(); $("results").innerHTML = ""; }
+  const was = activeField;
+  setPick(activeField, window._results[+row.dataset.i]);
+  $("results").innerHTML = "";
+  // 빈 칸이 남아 있으면 그 칸으로, 다 찼으면 바로 경로 보기 (출발지를 고른 경우는 제외)
+  const next = pick.vias.findIndex(v => !v);
+  if (next >= 0) { activeField = "v" + next; renderFields(); focusField(activeField); return; }
+  if (!pick.dest) { activeField = "dest"; renderFields(); focusField("dest"); return; }
+  renderFields();
+  if (was === "origin") { focusField("dest"); return; }
+  $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest, pick.vias);
 });
-$("goRoute").onclick = () => { $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest); };
+$("goRoute").onclick = () => { $("searchPanel").hidden = true; showRoute(pick.origin, pick.dest, pick.vias.filter(Boolean)); };
 
 // ───────── 설정 ─────────
 function openSettings(msg) {
@@ -681,7 +792,10 @@ async function handleShared(text) {
     } catch (e) {}
   }
   toast("공유된 내용에서 목적지를 찾지 못했습니다");
-  pick.dest = null; openSearch(); $("qDest").value = lines[0] || ""; if (lines[0]) doSearch(lines[0], "dest");
+  if (trip) clearRoute();
+  pick = { origin: null, dest: null, vias: [] }; openSearch();
+  const di = $("fields").querySelector('input[data-key="dest"]');
+  if (di && lines[0]) { di.value = lines[0]; doSearch(lines[0]); }
 }
 async function initShare() {
   const P = isNative && window.Capacitor.Plugins && window.Capacitor.Plugins.ShareIn;
