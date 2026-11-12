@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">NACS 충전지도</string>
-    <string name="title_activity_main">NACS 충전지도</string>
+    <string name="app_name">NACS</string>
+    <string name="title_activity_main">NACS</string>
     <string name="package_name">com.noblenook.nacsmap</string>
     <string name="custom_url_scheme">com.noblenook.nacsmap</string>
 </resources>

@@ -1,4 +1,4 @@
-# NACS 충전지도
+# NACS
 
 한국 공공 충전소 데이터(한국환경공단)의 NACS 충전기(chgerType 10: DC콤보+NACS)와
 테슬라 슈퍼차저(supercharge.info 커뮤니티 데이터)를 지도에 보여주는 개인용 앱.

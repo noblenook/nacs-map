@@ -1,6 +1,6 @@
 {
   "appId": "com.noblenook.nacsmap",
-  "appName": "NACS 충전지도",
+  "appName": "NACS",
   "webDir": "www",
   "plugins": {
     "CapacitorHttp": { "enabled": true }

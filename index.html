@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NACS 충전지도</title>
+<title>NACS</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
@@ -285,15 +285,100 @@ function project(it) {
   }
   return { off: best, along };
 }
+
+// ───────── 진행 방향 판단 (반대편 휴게소 제외) ─────────
+// 이름의 "OO방향" / "(OO)" / "(Seoul)" 의 도시 좌표
+const CITY = {
+  서울: [37.566, 126.978], 부산: [35.180, 129.076], 서부산: [35.150, 128.980], 기장: [35.244, 129.222], 인천: [37.456, 126.705],
+  대구: [35.871, 128.601], 대전: [36.350, 127.385], 광주: [35.160, 126.853], 울산: [35.538, 129.311], 세종: [36.480, 127.289],
+  강릉: [37.752, 128.876], 양양: [38.075, 128.619], 속초: [38.207, 128.592], 춘천: [37.881, 127.730], 홍천: [37.697, 127.888],
+  원주: [37.342, 127.920], 삼척: [37.450, 129.165], 동해: [37.525, 129.114], 태백: [37.164, 128.986], 평창: [37.370, 128.390],
+  양평: [37.491, 127.487], 하남: [37.539, 127.215], 여주: [37.298, 127.637], 이천: [37.272, 127.435], 용인: [37.241, 127.178],
+  수원: [37.263, 127.028], 평택: [36.992, 127.113], 안성: [37.008, 127.280], 천안: [36.815, 127.114], 아산: [36.790, 127.000],
+  당진: [36.893, 126.629], 서산: [36.785, 126.450], 홍성: [36.601, 126.660], 보령: [36.333, 126.613], 서천: [36.080, 126.690],
+  공주: [36.446, 127.119], 논산: [36.187, 127.099], 청주: [36.642, 127.489], 충주: [36.991, 127.926], 제천: [37.133, 128.191],
+  남이: [36.583, 127.472], 진천: [36.855, 127.436], 음성: [36.940, 127.690], 옥천: [36.306, 127.571], 영동: [36.175, 127.783],
+  금산: [36.109, 127.488], 무주: [36.007, 127.661], 전주: [35.824, 127.148], 완주: [35.905, 127.162], 익산: [35.948, 126.957],
+  군산: [35.967, 126.737], 정읍: [35.570, 126.856], 남원: [35.416, 127.390], 고창: [35.436, 126.702], 담양: [35.321, 126.988],
+  장성: [35.302, 126.785], 목포: [34.812, 126.392], 무안: [34.990, 126.480], 나주: [35.016, 126.710], 순천: [34.951, 127.487],
+  광양: [34.940, 127.696], 여수: [34.760, 127.660], 보성: [34.771, 127.080], 장흥: [34.680, 126.907], 해남: [34.573, 126.599],
+  진주: [35.180, 128.108], 사천: [35.004, 128.064], 하동: [35.067, 127.751], 함양: [35.521, 127.725], 거창: [35.686, 127.909],
+  창원: [35.228, 128.681], 마산: [35.214, 128.580], 통영: [34.854, 128.433], 거제: [34.880, 128.620], 김해: [35.228, 128.889],
+  밀양: [35.503, 128.746], 양산: [35.335, 129.037], 언양: [35.565, 129.120], 경주: [35.856, 129.225], 포항: [36.019, 129.344],
+  영덕: [36.415, 129.365], 울진: [36.993, 129.400], 안동: [36.568, 128.729], 영주: [36.806, 128.624], 상주: [36.411, 128.159],
+  김천: [36.140, 128.114], 구미: [36.120, 128.344], 칠곡: [35.995, 128.401], 경산: [35.825, 128.741], 영천: [35.973, 128.938],
+  문경: [36.586, 128.187], 가평: [37.831, 127.510], 파주: [37.760, 126.780], 문산: [37.856, 126.785], 고양: [37.658, 126.832],
+  김포: [37.615, 126.716], 안산: [37.322, 126.831], 화성: [37.200, 126.830], 구리: [37.594, 127.130], 의정부: [37.738, 127.034]
+};
+const CITY_EN = { Seoul: "서울", Busan: "부산", Incheon: "인천", Daegu: "대구", Daejeon: "대전", Gwangju: "광주", Ulsan: "울산",
+  Sejong: "세종", Gangneung: "강릉", Yangyang: "양양", Sokcho: "속초", Chuncheon: "춘천", Wonju: "원주", Samcheok: "삼척",
+  Donghae: "동해", Yangpyeong: "양평", Hanam: "하남", Yeoju: "여주", Icheon: "이천", Yongin: "용인", Suwon: "수원",
+  Pyeongtaek: "평택", Cheonan: "천안", Dangjin: "당진", Seosan: "서산", Gongju: "공주", Nonsan: "논산", Cheongju: "청주",
+  Chungju: "충주", Jecheon: "제천", Jeonju: "전주", Iksan: "익산", Gunsan: "군산", Mokpo: "목포", Suncheon: "순천",
+  Yeosu: "여수", Jinju: "진주", Changwon: "창원", Masan: "마산", Tongyeong: "통영", Gimhae: "김해", Gyeongju: "경주",
+  Pohang: "포항", Yeongdeok: "영덕", Andong: "안동", Sangju: "상주", Gimcheon: "김천", Gumi: "구미", Munsan: "문산",
+  Gapyeong: "가평", Hongcheon: "홍천", Paju: "파주", Goyang: "고양", Gimpo: "김포", Miryang: "밀양", Hamyang: "함양" };
+const HIGHWAY = /휴게소|졸음쉼터|고속도로|IC|JC|Rest Area|Expressway|Service Area/i;
+
+function dirTarget(it) {
+  const n = it.name || "";
+  if (/양방향/.test(n)) return "both";
+  if (/상행/.test(n)) return CITY.서울;
+  if (/하행/.test(n)) return "down";
+  const en = n.match(/\(\s*([A-Za-z]+)(?:[-\s]?bound)?\s*\)/);
+  if (en && CITY_EN[en[1]]) return CITY[CITY_EN[en[1]]];
+  const m = n.match(/([가-힣]{1,10})\s*방향/) || n.match(/\(\s*([가-힣]{2,6})\s*\)/);
+  if (!m) return null;
+  // "대관령휴게소강릉방향" 처럼 붙어 있어도 끝에서부터 도시 이름을 찾음
+  for (let len = Math.min(4, m[1].length); len >= 2; len--) {
+    const k = m[1].slice(-len);
+    if (CITY[k]) return CITY[k];
+  }
+  return null;
+}
+function pointAt(along) {
+  const c = route.cum, p = route.pts;
+  let lo = 0, hi = c.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (c[mid] <= along) lo = mid; else hi = mid; }
+  const seg = c[hi] - c[lo], t = seg ? (along - c[lo]) / seg : 0;
+  return [p[lo][0] + t * (p[hi][0] - p[lo][0]), p[lo][1] + t * (p[hi][1] - p[lo][1])];
+}
+// 반환: true(진행 방향) / false(반대편)
+function sameDirection(it, r) {
+  const total = route.cum[route.cum.length - 1];
+  const a = pointAt(Math.max(0, r.along - 1.5)), b = pointAt(Math.min(total, r.along + 1.5));
+  const kx = 111.32 * Math.cos(it.lat * Math.PI / 180), ky = 110.57;
+  const vx = (b[1] - a[1]) * kx, vy = (b[0] - a[0]) * ky;           // 진행 방향 벡터
+  const tgt = dirTarget(it);
+  if (tgt === "both") return true;
+  if (tgt === "down" || Array.isArray(tgt)) {
+    const city = tgt === "down" ? CITY.서울 : tgt;
+    const wx = (city[1] - it.lng) * kx, wy = (city[0] - it.lat) * ky;
+    if (Math.hypot(wx, wy) > 3) {                                    // 도시가 충분히 멀 때만 이름으로 판단
+      const ahead = vx * wx + vy * wy > 0;
+      return tgt === "down" ? !ahead : ahead;
+    }
+  }
+  if (!HIGHWAY.test(it.name + " " + (it.addr || ""))) return true;   // 일반 도로 충전소는 양쪽 다 이용 가능
+  // 고속도로 시설인데 방향 표기가 없으면: 우측통행이므로 진행 방향 오른쪽에 있는 곳만
+  const near = pointAt(r.along);
+  const sx = (it.lng - near[1]) * kx, sy = (it.lat - near[0]) * ky;
+  if (Math.hypot(sx, sy) < 0.03) return true;                       // 경로 위에 있어 구분 불가 → 표시
+  return vx * sy - vy * sx < 0;                                      // 외적 < 0 → 오른쪽
+}
+
 function computeCorridor() {
   if (!route) { items.forEach(it => it._route = null); return; }
   const pad = corridorKm / 100 + 0.05;
   const b = route.bounds;
+  route.opposite = 0;
   for (const it of items) {
     it._route = null;
     if (it.lat < b.s - pad || it.lat > b.n + pad || it.lng < b.w - pad || it.lng > b.e + pad) continue;
     const r = project(it);
-    if (r.off <= corridorKm) it._route = r;
+    if (r.off > corridorKm) continue;
+    if (!sameDirection(it, r)) { if (selected.has(it.op)) route.opposite++; continue; }
+    it._route = r;
   }
 }
 
@@ -321,7 +406,7 @@ function renderSheet(vis) {
     const scStalls = sc.reduce((a, i) => a + i.stalls, 0);
     const nFree = nc.reduce((a, i) => a + i._sum.free, 0), nTotal = nc.reduce((a, i) => a + i._sum.total, 0);
     $("sheetTitle").textContent = `${route.origin.name} → ${route.dest.name}`;
-    $("routeBox").innerHTML = `<div class="routeinfo">${fmtKm(route.distance)} · ${fmtDur(route.duration)} · 경로 ${corridorKm}km 이내</div>
+    $("routeBox").innerHTML = `<div class="routeinfo">${fmtKm(route.distance)} · ${fmtDur(route.duration)} · 진행 방향 ${corridorKm}km 이내${route.opposite ? ` · 반대편 ${route.opposite}곳 제외` : ""}</div>
       <div class="summary">
         <div class="sumcard"><div class="k"><span class="dot sq" style="background:var(--sc)"></span>슈퍼차저</div>
           <div class="v">${sc.length}곳 <small>총 ${scStalls}기</small></div></div>
@@ -506,7 +591,7 @@ function openSearch() {
   $("qOrigin").value = pick.origin ? pick.origin.name : "";
   $("qDest").value = pick.dest ? pick.dest.name : "";
   setActive("dest"); $("qDest").focus(); updateGo();
-  if (!$("qDest").value) $("results").innerHTML = `<div class="hint">목적지를 입력하세요. 출발지를 비워두면 내 위치에서 출발합니다.<br>카카오맵·네이버지도·테스맵에서 장소를 <b>공유 → NACS 충전지도</b>로 보내도 바로 경로가 열립니다(안드로이드 앱).</div>`;
+  if (!$("qDest").value) $("results").innerHTML = `<div class="hint">목적지를 입력하세요. 출발지를 비워두면 내 위치에서 출발합니다.<br>카카오맵·네이버지도·테스맵에서 장소를 <b>공유 → NACS</b>로 보내도 바로 경로가 열립니다(안드로이드 앱).</div>`;
 }
 function setActive(f) { activeField = f; $("fOrigin").classList.toggle("active", f === "origin"); $("fDest").classList.toggle("active", f === "dest"); }
 function updateGo() { $("goRoute").disabled = !pick.dest; }

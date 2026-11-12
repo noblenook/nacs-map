@@ -23,7 +23,7 @@
             </intent-filter>
 
             <!-- 테스맵·카카오맵·네이버지도 등에서 '공유' → 목적지로 받기 -->
-            <intent-filter android:label="NACS 경로 충전소">
+            <intent-filter android:label="NACS">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
